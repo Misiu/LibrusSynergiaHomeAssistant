@@ -67,5 +67,10 @@
         "name": "Lesson timetable"
       }
     }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Authentication with Librus failed. Check the configured username and password."
+    }
   }
 }
