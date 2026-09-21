@@ -13,6 +13,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpda
 
 from .const import DEFAULT_PLAN_DAYS, DOMAIN
 from .coordinator import LibrusDataUpdateCoordinator
+PARALLEL_UPDATES = 0
+
 from .plan_lekcji import (
     biezacy_dzien,
     dni_do_wyswietlenia,
@@ -47,7 +49,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Konfiguracja platformy czujnikow Librus APIX."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
 
     entities: List[SensorEntity] = [
         LibrusUczenSensor(coordinator, config_entry),
