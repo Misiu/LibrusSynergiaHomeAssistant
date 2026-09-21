@@ -16,7 +16,7 @@ from librus_apix.exceptions import AuthorizationError, MaintananceError
 from custom_components.librus_apix.const import DOMAIN
 
 
-def _dzis():
+def _dzis() -> object:
     """Dzisiejsza data wedlug strefy Home Assistanta.
 
     Czujniki uzywaja dt_util.now(), a nie zegara systemowego. W testach HA
@@ -27,7 +27,7 @@ def _dzis():
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
+def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Wlacz ladowanie custom_components w testach."""
     return
 
@@ -53,7 +53,9 @@ def _lekcja(numer, przedmiot, od, do, dzien=None, zastepstwo=False, odwolana=Fal
 
 
 
-def _entity_id(hass: HomeAssistant, platform: str, entry, suffix: str) -> str:
+def _entity_id(
+    hass: HomeAssistant, platform: str, entry: MockConfigEntry, suffix: str
+) -> str:
     """Znajdz entity_id po stabilnym unique_id integracji."""
     registry = er.async_get(hass)
     entity_id = registry.async_get_entity_id(
@@ -64,7 +66,7 @@ def _entity_id(hass: HomeAssistant, platform: str, entry, suffix: str) -> str:
 
 
 @pytest.fixture
-def mock_config_entry():
+def mock_config_entry() -> MockConfigEntry:
     """Return a mock config entry."""
     return MockConfigEntry(
         domain=DOMAIN,
@@ -74,7 +76,7 @@ def mock_config_entry():
 
 
 @pytest.fixture
-def mock_librus_client():
+def mock_librus_client() -> MagicMock:
     """Return a mock Librus client."""
     client = MagicMock()
     client.async_authenticate = AsyncMock(return_value=True)
@@ -110,7 +112,9 @@ def mock_librus_client():
     return client
 
 
-async def _setup(hass: HomeAssistant, entry, client) -> None:
+async def _setup(
+    hass: HomeAssistant, entry: MockConfigEntry, client: MagicMock
+) -> None:
     """Skonfiguruj integracje z zamockowanym klientem."""
     entry.add_to_hass(hass)
     with patch("custom_components.librus_apix.LibrusApiClient", return_value=client):
@@ -141,13 +145,8 @@ async def test_unload_entry(hass: HomeAssistant, mock_config_entry, mock_librus_
     await hass.async_block_till_done()
 
     assert mock_config_entry.state is config_entries.ConfigEntryState.NOT_LOADED
-
-    sensor_component = hass.data["entity_components"]["sensor"]
-    calendar_component = hass.data["entity_components"]["calendar"]
-    assert all(entity.entity_id != sensor_id for entity in sensor_component.entities)
-    assert all(
-        entity.entity_id != calendar_id for entity in calendar_component.entities
-    )
+    assert hass.states.get(sensor_id).state == "unavailable"
+    assert hass.states.get(calendar_id).state == "unavailable"
 
 
 async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_librus_client):
@@ -302,29 +301,22 @@ async def test_plan_tygodnia_zawsze_pokazuje_piec_dni(
     assert list(tydzien)[-1] == (dzis + timedelta(days=5)).strftime("%Y-%m-%d")
 
 
-async def test_sensor_i_calendar_uzywaja_tego_samego_koordynatora(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
-    """Sensor i kalendarz nie moga wykonywac osobnych cykli odpytywania Librusa."""
+async def test_sensor_i_calendar_korzystaja_z_jednego_cyklu_api(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
+    """Sensor i calendar powstaja z jednego cyklu pobrania danych."""
     await _setup(hass, mock_config_entry, mock_librus_client)
-
-    sensor_component = hass.data["entity_components"]["sensor"]
-    calendar_component = hass.data["entity_components"]["calendar"]
 
     sensor_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
     calendar_id = _entity_id(
         hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
     )
-    sensor_entity = next(
-        entity for entity in sensor_component.entities if entity.entity_id == sensor_id
-    )
-    calendar_entity = next(
-        entity for entity in calendar_component.entities if entity.entity_id == calendar_id
-    )
 
-    assert sensor_entity.coordinator is calendar_entity.coordinator
+    assert hass.states.get(sensor_id) is not None
+    assert hass.states.get(calendar_id) is not None
     assert mock_librus_client.async_get_timetable.await_count == 1
-
 
 
 async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
@@ -547,22 +539,27 @@ async def test_coordinator_ma_staly_interwal_dwie_godziny(
     assert mock_config_entry.runtime_data.update_interval == timedelta(hours=2)
 
 
-async def test_encje_uzywaja_has_entity_name(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
-    """Wszystkie encje korzystaja z nowego modelu nazw Home Assistant."""
+async def test_encje_uzywaja_nowych_nazw_home_assistant(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
+    """Nazwy encji lacza nazwe urzadzenia z przetlumaczona nazwa encji."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    sensor_component = hass.data["entity_components"]["sensor"]
-    calendar_component = hass.data["entity_components"]["calendar"]
-    entities = [
-        entity
-        for entity in [*sensor_component.entities, *calendar_component.entities]
-        if entity.platform.config_entry is mock_config_entry
-    ]
+    sensor_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
+    calendar_id = _entity_id(
+        hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
+    )
 
-    assert entities
-    assert all(entity.has_entity_name for entity in entities)
+    assert (
+        hass.states.get(sensor_id).attributes["friendly_name"]
+        == "Librus - Jan Kowalski Lesson timetable"
+    )
+    assert (
+        hass.states.get(calendar_id).attributes["friendly_name"]
+        == "Librus - Jan Kowalski Lesson timetable"
+    )
 
 
 async def test_pelna_awaria_oznacza_encje_jako_unavailable(
