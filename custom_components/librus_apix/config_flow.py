@@ -9,18 +9,11 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
-from homeassistant.core import callback
-from homeassistant.helpers import selector
 
 from librus_apix.client import new_client
+from librus_apix.exceptions import AuthorizationError, MaintananceError
 
-from .const import (
-    CONF_SCAN_INTERVAL_MINUTES,
-    DEFAULT_SCAN_INTERVAL_MINUTES,
-    DOMAIN,
-    MAX_SCAN_INTERVAL_MINUTES,
-    MIN_SCAN_INTERVAL_MINUTES,
-)
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,38 +25,43 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict):
-    """Validate the user input allows us to connect."""
+class CannotConnect(Exception):
+    """Error to indicate we cannot connect to Librus."""
+
+
+class InvalidAuth(Exception):
+    """Error to indicate Librus rejected the credentials."""
+
+
+async def validate_input(
+    hass: HomeAssistant, data: dict[str, str]
+) -> dict[str, str]:
+    """Validate that the supplied credentials work."""
     username = data[CONF_USERNAME]
     password = data[CONF_PASSWORD]
-    
-    # Test authentication
+
     try:
         client = await hass.async_add_executor_job(new_client)
-        token = await hass.async_add_executor_job(client.get_token, username, password)
-        
-        if not token:
-            raise ValueError("Authentication failed")
-            
-        return {"title": f"Librus APIX ({username})"}
-    
-    except Exception as ex:
-        _LOGGER.error("Authentication error: %s", ex)
-        raise ValueError("Cannot connect") from ex
+        token = await hass.async_add_executor_job(
+            client.get_token, username, password
+        )
+    except AuthorizationError as err:
+        raise InvalidAuth from err
+    except MaintananceError as err:
+        raise CannotConnect from err
+    except OSError as err:
+        raise CannotConnect from err
+
+    if not token:
+        raise InvalidAuth
+
+    return {"title": f"Librus APIX ({username})"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Librus APIX."""
 
     VERSION = 1
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> "OptionsFlowHandler":
-        """Zwroc obsluge opcji integracji."""
-        return OptionsFlowHandler()
 
     async def async_step_user(
         self, user_input: dict | None = None
@@ -77,9 +75,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             try:
                 info = await validate_input(self.hass, user_input)
-            except ValueError:
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
                 errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
+            except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
@@ -112,8 +112,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
             try:
                 await validate_input(self.hass, new_data)
-            except ValueError:
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
                 errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during reauthentication")
+                errors["base"] = "unknown"
             else:
                 return self.async_update_reload_and_abort(
                     reauth_entry, data=new_data
@@ -126,37 +131,3 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"username": username},
         )
 
-
-class OptionsFlowHandler(config_entries.OptionsFlowWithReload):
-    """Opcje integracji - na razie tylko czestotliwosc odpytywania Librusa.
-
-    OptionsFlowWithReload sam przeladowuje wpis po zapisaniu opcji, wiec nowy
-    interwal zaczyna obowiazywac od razu, bez restartu Home Assistanta.
-    """
-
-    async def async_step_init(
-        self, user_input: dict | None = None
-    ) -> ConfigFlowResult:
-        """Formularz opcji."""
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
-
-        biezacy = self.config_entry.options.get(
-            CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL_MINUTES
-        )
-        schemat = vol.Schema(
-            {
-                vol.Required(
-                    CONF_SCAN_INTERVAL_MINUTES, default=biezacy
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=MIN_SCAN_INTERVAL_MINUTES,
-                        max=MAX_SCAN_INTERVAL_MINUTES,
-                        step=5,
-                        unit_of_measurement="min",
-                        mode=selector.NumberSelectorMode.BOX,
-                    )
-                )
-            }
-        )
-        return self.async_show_form(step_id="init", data_schema=schemat)
