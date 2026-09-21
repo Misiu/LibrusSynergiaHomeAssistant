@@ -1,29 +1,23 @@
 """The Librus APIX integration."""
 
-import logging
-
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
-
+from librus_apix.exceptions import AuthorizationError
 
 from .api import LibrusApiClient
 from .const import DOMAIN
-from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator, _current_semester
+from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
 
-_LOGGER = logging.getLogger(__name__)
-
-
-PLATFORMS = ["sensor", "calendar"]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CALENDAR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bool:
     """Set up Librus APIX from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
-    
+ 
     client = LibrusApiClient(username, password)
     
-    # Test authentication
     if not await client.async_authenticate():
         if isinstance(client.last_auth_error, AuthorizationError):
             raise ConfigEntryAuthFailed(
@@ -36,8 +30,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bo
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
-
-    # Sensor i calendar korzystaja z tej samej instancji koordynatora.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
     return True
