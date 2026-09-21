@@ -140,8 +140,14 @@ async def test_unload_entry(hass: HomeAssistant, mock_config_entry, mock_librus_
     assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert hass.states.get(sensor_id) is None
-    assert hass.states.get(calendar_id) is None
+    assert mock_config_entry.state is config_entries.ConfigEntryState.NOT_LOADED
+
+    sensor_component = hass.data["entity_components"]["sensor"]
+    calendar_component = hass.data["entity_components"]["calendar"]
+    assert all(entity.entity_id != sensor_id for entity in sensor_component.entities)
+    assert all(
+        entity.entity_id != calendar_id for entity in calendar_component.entities
+    )
 
 
 async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_librus_client):
@@ -433,8 +439,8 @@ async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
     srednia_id = registry.async_get_entity_id("sensor", DOMAIN, srednia_unique)
     assert chemia_id is not None
     assert srednia_id is not None
-    assert hass.states[chemia_id].state == "4"
-    assert hass.states[srednia_id].state == "4.0"
+    assert hass.states.get(chemia_id).state == "4"
+    assert hass.states.get(srednia_id).state == "4.0"
 
 
 async def test_wszystkie_encje_maja_to_samo_urzadzenie(
@@ -535,33 +541,33 @@ async def test_glowne_sensory_wystawiaja_spojne_dane(
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    uczen = hass.states[
+    uczen = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "uczen")
-    ]
-    lucky = hass.states[
+    )
+    lucky = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "szczesliwy_numerek")
-    ]
-    oceny = hass.states[
+    )
+    oceny = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "oceny")
-    ]
-    wiadomosci = hass.states[
+    )
+    wiadomosci = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "wiadomosci")
-    ]
-    zadania = hass.states[
+    )
+    zadania = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "zadania")
-    ]
-    terminarz = hass.states[
+    )
+    terminarz = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "terminarz")
-    ]
-    srednia = hass.states[
+    )
+    srednia = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "srednia_ocen")
-    ]
-    matematyka = hass.states[
+    )
+    matematyka = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "przedmiot_matematyka")
-    ]
-    srednia_matematyka = hass.states[
+    )
+    srednia_matematyka = hass.states.get(
         _entity_id(hass, "sensor", mock_config_entry, "srednia_matematyka")
-    ]
+    )
 
     assert uczen.state == "Jan Kowalski"
     assert uczen.attributes["klasa"] == "8A"
@@ -587,7 +593,7 @@ async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
     lucky_id = _entity_id(
         hass, "sensor", mock_config_entry, "szczesliwy_numerek"
     )
-    assert hass.states[lucky_id].state == "13"
+    assert hass.states.get(lucky_id).state == "13"
 
     mock_librus_client.async_get_student_information.return_value = SimpleNamespace(
         name="Jan Kowalski",
@@ -601,4 +607,4 @@ async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
     await mock_config_entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
 
-    assert hass.states[lucky_id].state == "21"
+    assert hass.states.get(lucky_id).state == "21"
