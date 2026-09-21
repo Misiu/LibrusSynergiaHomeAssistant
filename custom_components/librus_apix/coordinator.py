@@ -11,13 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 from librus_apix.exceptions import AuthorizationError
 
-from .const import (
-    CONF_SCAN_INTERVAL_MINUTES,
-    DEFAULT_SCAN_INTERVAL_MINUTES,
-    DOMAIN,
-    MAX_SCAN_INTERVAL_MINUTES,
-    MIN_SCAN_INTERVAL_MINUTES,
-)
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,19 +20,6 @@ def _current_semester() -> int:
     """Zwroc numer biezacego semestru wg polskiego roku szkolnego."""
     month = dt_util.now().month
     return 1 if month >= 9 or month == 1 else 2
-
-
-def _interwal_odswiezania(config_entry: ConfigEntry) -> timedelta:
-    """Odczytaj czestotliwosc odpytywania Librusa z opcji integracji."""
-    minuty = config_entry.options.get(
-        CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL_MINUTES
-    )
-    try:
-        minuty = int(minuty)
-    except (TypeError, ValueError):
-        minuty = DEFAULT_SCAN_INTERVAL_MINUTES
-    minuty = max(MIN_SCAN_INTERVAL_MINUTES, min(MAX_SCAN_INTERVAL_MINUTES, minuty))
-    return timedelta(minutes=minuty)
 
 
 def _jest_nowa(date_str: str) -> bool:
@@ -82,15 +63,19 @@ class LibrusCoordinatorData(TypedDict):
     semestr_biezacy: int
 
 
+type LibrusConfigEntry = ConfigEntry[LibrusDataUpdateCoordinator]
+
+UPDATE_INTERVAL = timedelta(hours=2)
+
+
 class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
     """Klasa zarzadzajaca pobieraniem danych z Librus."""
 
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
         client: Any,
-        update_interval: timedelta,
     ) -> None:
         """Inicjalizacja koordynatora."""
         self.client = client
@@ -105,7 +90,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             _LOGGER,
             config_entry=config_entry,
             name=DOMAIN,
-            update_interval=update_interval,
+            update_interval=UPDATE_INTERVAL,
         )
 
     async def _async_update_data(self) -> LibrusCoordinatorData:
@@ -130,6 +115,19 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
 
             plan_raw = await self.client.async_get_timetable()
             self._raise_if_auth_failed()
+
+            if all(
+                value is None
+                for value in (
+                    student_info,
+                    grades,
+                    messages,
+                    homework_raw,
+                    schedule_raw,
+                    plan_raw,
+                )
+            ):
+                raise UpdateFailed("Librus API is unavailable")
 
             prev = self.data or {}
 
