@@ -25,4 +25,4 @@ jobs:
       - name: Compile integration
         run: python -m compileall -q custom_components/librus_apix tests
       - name: Run tests
-        run: python -m pytest -q
+        run: python -m pytest -q --cov=custom_components/librus_apix --cov-report=term-missing --cov-fail-under=95
