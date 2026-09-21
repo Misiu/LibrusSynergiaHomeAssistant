@@ -17,6 +17,12 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def _current_semester() -> int:
+    """Zwroc numer biezacego semestru wg polskiego roku szkolnego."""
+    month = date.today().month
+    return 1 if month >= 9 or month == 1 else 2
+
+
 def _interwal_odswiezania(config_entry: ConfigEntry) -> timedelta:
     """Odczytaj czestotliwosc odpytywania Librusa z opcji integracji."""
     minuty = config_entry.options.get(
@@ -63,6 +69,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         hass: HomeAssistant,
+        config_entry: ConfigEntry,
         client: Any,
         update_interval: timedelta,
     ) -> None:
@@ -77,14 +84,14 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=DOMAIN,
             update_interval=update_interval,
         )
 
     async def _async_update_data(self) -> Dict[str, Any]:
         """Pobierz aktualne dane z API Librus."""
-        from datetime import date as _date
-        current_sem = 1 if _date.today().month >= 9 else 2
+        current_sem = _current_semester()
 
         try:
             student_info = await self.client.async_get_student_information()
@@ -94,57 +101,45 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
             schedule_raw = await self.client.async_get_schedule()
             plan_raw = await self.client.async_get_timetable()
 
+            prev = self.data or {}
+
             if grades is None:
-                # Zachowaj poprzednie dane o ocenach jesli dostepne, wiadomosci zaktualizuj jesli OK
-                prev = self.data or {}
-                if not prev.get("oceny"):
+                if "oceny" not in prev:
                     raise UpdateFailed("Nie udalo sie pobrac ocen i brak danych w cache")
-                _LOGGER.warning("Nie udalo sie pobrac ocen - uzywam poprzednich danych z cache")
-                return {
-                    "student_info": student_info or prev.get("student_info"),
-                    "oceny": prev.get("oceny", []),
-                    "oceny_wg_przedmiotu": prev.get("oceny_wg_przedmiotu", {}),
-                    "wiadomosci": (
-                        self._build_wiadomosci(messages)
-                        if messages is not None
-                        else prev.get("wiadomosci", [])
-                    ),
-                    "zadania": (
-                        self._build_zadania(homework_raw)
-                        if homework_raw is not None
-                        else prev.get("zadania", [])
-                    ),
-                    "terminarz": (
-                        schedule_raw
-                        if schedule_raw is not None
-                        else prev.get("terminarz", [])
-                    ),
-                    "plan_lekcji": (
-                        plan_raw
-                        if plan_raw is not None
-                        else prev.get("plan_lekcji", [])
-                    ),
-                }
+                grades = prev.get("oceny", [])
+                oceny_wg_przedmiotu = prev.get("oceny_wg_przedmiotu", {})
+            else:
+                oceny_wg_przedmiotu: Dict[str, List[Dict]] = {}
+                for grade in grades:
+                    subject = grade["subject"]
+                    if subject not in oceny_wg_przedmiotu:
+                        oceny_wg_przedmiotu[subject] = []
+                    oceny_wg_przedmiotu[subject].append({
+                        "ocena": grade["grade"],
+                        "data": grade["date"],
+                        "kategoria": grade["category"],
+                        "nauczyciel": grade["teacher"],
+                        "semestr": grade.get("semester"),
+                        "jest_nowa": _jest_nowa(grade["date"]),
+                    })
 
-            # Grupuj oceny wg przedmiotu i oznacz nowe
-            oceny_wg_przedmiotu: Dict[str, List[Dict]] = {}
-            for grade in grades:
-                subject = grade["subject"]
-                if subject not in oceny_wg_przedmiotu:
-                    oceny_wg_przedmiotu[subject] = []
-                oceny_wg_przedmiotu[subject].append({
-                    "ocena": grade["grade"],
-                    "data": grade["date"],
-                    "kategoria": grade["category"],
-                    "nauczyciel": grade["teacher"],
-                    "semestr": grade.get("semester"),
-                    "jest_nowa": _jest_nowa(grade["date"]),
-                })
-
-            wiadomosci = self._build_wiadomosci(messages)
-            zadania = self._build_zadania(homework_raw)
-            terminarz = schedule_raw if schedule_raw is not None else []
-            plan_lekcji = plan_raw if plan_raw is not None else []
+            student_info = student_info or prev.get("student_info")
+            wiadomosci = (
+                self._build_wiadomosci(messages)
+                if messages is not None
+                else prev.get("wiadomosci", [])
+            )
+            zadania = (
+                self._build_zadania(homework_raw)
+                if homework_raw is not None
+                else prev.get("zadania", [])
+            )
+            terminarz = (
+                schedule_raw if schedule_raw is not None else prev.get("terminarz", [])
+            )
+            plan_lekcji = (
+                plan_raw if plan_raw is not None else prev.get("plan_lekcji", [])
+            )
 
             result = {
                 "student_info": student_info,
