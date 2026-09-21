@@ -114,7 +114,6 @@ class LibrusUczenSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "student_information"
         self._attr_unique_id = f"{config_entry.entry_id}_uczen"
-        self._attr_icon = "mdi:account-school"
 
     @property
     def native_value(self) -> Optional[str]:
@@ -145,7 +144,6 @@ class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "lucky_number"
         self._attr_unique_id = f"{config_entry.entry_id}_szczesliwy_numerek"
-        self._attr_icon = "mdi:numeric"
 
     @property
     def native_value(self) -> Any:
@@ -163,7 +161,6 @@ class LibrusOcenySensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "grades"
         self._attr_unique_id = f"{config_entry.entry_id}_oceny"
-        self._attr_icon = "mdi:school"
 
     @property
     def native_value(self) -> int:
@@ -205,7 +202,6 @@ class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
         self._attr_translation_key = "subject_grades"
         self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_przedmiot_{safe_name}"
-        self._attr_icon = "mdi:book-open-variant"
 
     @property
     def native_value(self) -> Optional[str]:
@@ -255,7 +251,6 @@ class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "average_grade"
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_ocen"
-        self._attr_icon = "mdi:chart-line"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
 
@@ -301,7 +296,6 @@ class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
         self._attr_translation_key = "subject_average"
         self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_{safe_name}"
-        self._attr_icon = "mdi:chart-bar"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
 
@@ -330,7 +324,6 @@ class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "schedule"
         self._attr_unique_id = f"{config_entry.entry_id}_terminarz"
-        self._attr_icon = "mdi:calendar-month"
 
     @property
     def native_value(self) -> int:
@@ -360,7 +353,6 @@ class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "homework"
         self._attr_unique_id = f"{config_entry.entry_id}_zadania"
-        self._attr_icon = "mdi:calendar-check"
 
     @property
     def native_value(self) -> int:
@@ -416,7 +408,6 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity)
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "lesson_timetable"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji"
-        self._attr_icon = "mdi:timetable"
 
     def _plan(self) -> List[Dict]:
         return (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -485,7 +476,6 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEnt
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "next_lesson"
         self._attr_unique_id = f"{config_entry.entry_id}_nastepna_lekcja"
-        self._attr_icon = "mdi:clock-start"
 
     def _lekcja(self) -> Optional[Dict]:
         plan = (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -525,7 +515,6 @@ class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "messages"
         self._attr_unique_id = f"{config_entry.entry_id}_wiadomosci"
-        self._attr_icon = "mdi:message-text"
 
     @property
     def native_value(self) -> int:
