@@ -37,10 +37,8 @@ async def validate_input(hass: HomeAssistant, data: dict):
     
     # Test authentication
     try:
-        import asyncio
-        loop = asyncio.get_running_loop()
-        client = await loop.run_in_executor(None, new_client)
-        token = await loop.run_in_executor(None, client.get_token, username, password)
+        client = await hass.async_add_executor_job(new_client)
+        token = await hass.async_add_executor_job(client.get_token, username, password)
         
         if not token:
             raise ValueError("Authentication failed")
@@ -72,6 +70,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         
         if user_input is not None:
+            self._async_abort_entries_match(
+                {CONF_USERNAME: user_input[CONF_USERNAME]}
+            )
             try:
                 info = await validate_input(self.hass, user_input)
             except ValueError:
