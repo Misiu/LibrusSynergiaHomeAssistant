@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Konfiguracja Librus APIX",
+        "description": "Podaj dane logowania do Librus Synergia",
+        "data": {
+          "username": "Login",
+          "password": "Hasło"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie do Librus",
+        "description": "Logowanie dla konta {username} wygasło lub hasło zostało zmienione. Podaj aktualne hasło.",
+        "data": {
+          "password": "Hasło"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie udało się połączyć z Librusem. Spróbuj ponownie później.",
+      "unknown": "Wystąpił nieoczekiwany błąd.",
+      "invalid_auth": "Nieprawidłowe dane logowania. Sprawdź login i hasło do Librusa."
+    },
+    "abort": {
+      "already_configured": "To konto jest już skonfigurowane."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "student_information": {
+        "name": "Informacje o uczniu"
+      },
+      "lucky_number": {
+        "name": "Szczęśliwy numerek"
+      },
+      "grades": {
+        "name": "Oceny"
+      },
+      "subject_grades": {
+        "name": "{subject}"
+      },
+      "average_grade": {
+        "name": "Średnia ocen"
+      },
+      "subject_average": {
+        "name": "Średnia {subject}"
+      },
+      "schedule": {
+        "name": "Terminarz"
+      },
+      "homework": {
+        "name": "Zadania"
+      },
+      "lesson_timetable": {
+        "name": "Plan lekcji"
+      },
+      "next_lesson": {
+        "name": "Następna lekcja"
+      },
+      "messages": {
+        "name": "Wiadomości"
+      }
+    },
+    "calendar": {
+      "lesson_timetable": {
+        "name": "Plan lekcji"
+      }
+    }
+  }
+}
