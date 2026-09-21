@@ -15,6 +15,8 @@ from .const import (
     CONF_SCAN_INTERVAL_MINUTES,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DOMAIN,
+    MAX_SCAN_INTERVAL_MINUTES,
+    MIN_SCAN_INTERVAL_MINUTES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +37,8 @@ def _interwal_odswiezania(config_entry: ConfigEntry) -> timedelta:
         minuty = int(minuty)
     except (TypeError, ValueError):
         minuty = DEFAULT_SCAN_INTERVAL_MINUTES
-    return timedelta(minutes=max(1, minuty))
+    minuty = max(MIN_SCAN_INTERVAL_MINUTES, min(MAX_SCAN_INTERVAL_MINUTES, minuty))
+    return timedelta(minutes=minuty)
 
 
 def _jest_nowa(date_str: str) -> bool:
