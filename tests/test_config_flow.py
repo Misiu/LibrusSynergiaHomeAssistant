@@ -278,3 +278,91 @@ async def test_reconfigure_cannot_connect(
     assert result["step_id"] == "reconfigure"
     assert result["errors"] == {"base": "cannot_connect"}
     assert existing.data[CONF_PASSWORD] == "old-secret"
+
+
+
+async def test_user_flow_empty_token_is_invalid_auth(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """A falsy token is treated as rejected authentication."""
+    librus_client.get_token.return_value = None
+
+    result = await _run_user_flow(hass, librus_client)
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_reauth_unknown_error_can_recover(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Reauth can recover after an unexpected validation error."""
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        title="Librus APIX (123456)",
+        data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
+    )
+    existing.add_to_hass(hass)
+    librus_client.get_token.side_effect = [RuntimeError("boom"), object()]
+
+    with patch("librus_apix.client.new_client", return_value=librus_client):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_REAUTH,
+                "entry_id": existing.entry_id,
+            },
+            data=dict(existing.data),
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "first-secret"},
+        )
+        assert result["type"] is data_entry_flow.FlowResultType.FORM
+        assert result["errors"] == {"base": "unknown"}
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "new-secret"},
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert existing.data[CONF_PASSWORD] == "new-secret"
+
+
+async def test_reconfigure_unknown_error_can_recover(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Reconfigure can recover after an unexpected validation error."""
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        title="Librus APIX (123456)",
+        data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
+    )
+    existing.add_to_hass(hass)
+    librus_client.get_token.side_effect = [RuntimeError("boom"), object()]
+
+    with patch("librus_apix.client.new_client", return_value=librus_client):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": existing.entry_id,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "first-secret"},
+        )
+        assert result["type"] is data_entry_flow.FlowResultType.FORM
+        assert result["errors"] == {"base": "unknown"}
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "new-secret"},
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert existing.data[CONF_PASSWORD] == "new-secret"
