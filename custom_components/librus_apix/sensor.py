@@ -110,7 +110,7 @@ class LibrusUczenSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Informacje o uczniu"
+        self._attr_translation_key = "student_information"
         self._attr_unique_id = f"{config_entry.entry_id}_uczen"
         self._attr_icon = "mdi:account-school"
 
@@ -139,7 +139,7 @@ class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Szczesliwy numerek"
+        self._attr_translation_key = "lucky_number"
         self._attr_unique_id = f"{config_entry.entry_id}_szczesliwy_numerek"
         self._attr_icon = "mdi:numeric"
 
@@ -155,7 +155,7 @@ class LibrusOcenySensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Oceny"
+        self._attr_translation_key = "grades"
         self._attr_unique_id = f"{config_entry.entry_id}_oceny"
         self._attr_icon = "mdi:school"
 
@@ -194,7 +194,8 @@ class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_name = subject
+        self._attr_translation_key = "subject_grades"
+        self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_przedmiot_{safe_name}"
         self._attr_icon = "mdi:book-open-variant"
 
@@ -242,7 +243,7 @@ class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Srednia ocen"
+        self._attr_translation_key = "average_grade"
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_ocen"
         self._attr_icon = "mdi:chart-line"
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -285,7 +286,8 @@ class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
         super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_name = f"Srednia {subject}"
+        self._attr_translation_key = "subject_average"
+        self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_{safe_name}"
         self._attr_icon = "mdi:chart-bar"
         self._attr_state_class = SensorStateClass.MEASUREMENT
@@ -312,7 +314,7 @@ class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Terminarz"
+        self._attr_translation_key = "schedule"
         self._attr_unique_id = f"{config_entry.entry_id}_terminarz"
         self._attr_icon = "mdi:calendar-month"
 
@@ -340,7 +342,7 @@ class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Zadania"
+        self._attr_translation_key = "homework"
         self._attr_unique_id = f"{config_entry.entry_id}_zadania"
         self._attr_icon = "mdi:calendar-check"
 
@@ -394,7 +396,7 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity)
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Plan lekcji"
+        self._attr_translation_key = "lesson_timetable"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji"
         self._attr_icon = "mdi:timetable"
 
@@ -461,7 +463,7 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEnt
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Nastepna lekcja"
+        self._attr_translation_key = "next_lesson"
         self._attr_unique_id = f"{config_entry.entry_id}_nastepna_lekcja"
         self._attr_icon = "mdi:clock-start"
 
@@ -499,7 +501,7 @@ class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Wiadomosci"
+        self._attr_translation_key = "messages"
         self._attr_unique_id = f"{config_entry.entry_id}_wiadomosci"
         self._attr_icon = "mdi:message-text"
 
