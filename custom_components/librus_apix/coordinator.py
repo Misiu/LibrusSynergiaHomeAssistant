@@ -2,7 +2,7 @@
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -66,7 +66,20 @@ EVENT_NOWE_ZDARZENIE = f"{DOMAIN}_nowe_zdarzenie"
 EVENT_ZMIANA_PLANU = f"{DOMAIN}_zmiana_planu"
 
 
-class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
+class LibrusCoordinatorData(TypedDict):
+    """Dane udostepniane encjom przez wspolny coordinator."""
+
+    student_info: Any
+    oceny: List[Dict[str, Any]]
+    oceny_wg_przedmiotu: Dict[str, List[Dict[str, Any]]]
+    wiadomosci: List[Dict[str, Any]]
+    zadania: List[Dict[str, Any]]
+    terminarz: List[Dict[str, Any]]
+    plan_lekcji: List[Dict[str, Any]]
+    semestr_biezacy: int
+
+
+class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
     """Klasa zarzadzajaca pobieraniem danych z Librus."""
 
     def __init__(
@@ -92,7 +105,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=update_interval,
         )
 
-    async def _async_update_data(self) -> Dict[str, Any]:
+    async def _async_update_data(self) -> LibrusCoordinatorData:
         """Pobierz aktualne dane z API Librus."""
         current_sem = _current_semester()
 
