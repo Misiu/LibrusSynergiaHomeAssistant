@@ -61,6 +61,7 @@ class LibrusCoordinatorData(TypedDict):
     terminarz: List[Dict[str, Any]]
     plan_lekcji: List[Dict[str, Any]]
     semestr_biezacy: int
+    availability: Dict[str, bool]
 
 
 type LibrusConfigEntry = ConfigEntry[LibrusDataUpdateCoordinator]
@@ -129,6 +130,15 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             ):
                 raise UpdateFailed("Librus API is unavailable")
 
+            availability = {
+                "student_info": student_info is not None,
+                "grades": grades is not None,
+                "messages": messages is not None,
+                "homework": homework_raw is not None,
+                "schedule": schedule_raw is not None,
+                "timetable": plan_raw is not None,
+            }
+
             prev = self.data or {}
 
             if grades is None:
@@ -178,6 +188,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
                 "terminarz": terminarz,
                 "plan_lekcji": plan_lekcji,
                 "semestr_biezacy": current_sem,
+                "availability": availability,
             }
 
             # Pierwsze pobranie - tylko zapamietaj stan, nie wysylaj powiadomien
