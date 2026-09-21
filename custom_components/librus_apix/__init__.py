@@ -9,12 +9,13 @@ from typing import Dict, Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import config_validation as cv
 
 from librus_apix.client import Client, new_client
-from librus_apix.exceptions import TokenError
+from librus_apix.exceptions import AuthorizationError, MaintananceError, TokenError
 
 from .const import DOMAIN, SCAN_INTERVAL
 from .coordinator import LibrusDataUpdateCoordinator, _current_semester, _interwal_odswiezania
@@ -48,6 +49,7 @@ class LibrusApiClient:
         self._client: Client = None
         self._token = None
         self._auth_lock = asyncio.Lock()
+        self.last_auth_error: Exception | None = None
 
     def _reset_auth(self) -> None:
         """Reset authentication state to force re-authentication on next call."""
@@ -63,9 +65,21 @@ class LibrusApiClient:
                 self._token = await loop.run_in_executor(
                     None, self._client.get_token, self.username, self.password
                 )
+                self.last_auth_error = None
                 _LOGGER.debug("Authentication successful for %s", self.username)
                 return True
+            except AuthorizationError as ex:
+                self.last_auth_error = ex
+                _LOGGER.warning("Librus authentication rejected: %s", ex)
+                self._reset_auth()
+                return False
+            except MaintananceError as ex:
+                self.last_auth_error = ex
+                _LOGGER.warning("Librus is under maintenance: %s", ex)
+                self._reset_auth()
+                return False
             except Exception as ex:
+                self.last_auth_error = ex
                 _LOGGER.error("Authentication failed: %s\n%s", ex, traceback.format_exc())
                 self._reset_auth()
                 return False
@@ -401,8 +415,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Test authentication
     if not await client.async_authenticate():
-        _LOGGER.error("Failed to authenticate")
-        return False
+        if isinstance(client.last_auth_error, AuthorizationError):
+            raise ConfigEntryAuthFailed("Librus rejected the credentials")
+        raise ConfigEntryNotReady("Librus authentication is temporarily unavailable")
     
     coordinator = LibrusDataUpdateCoordinator(
         hass, entry, client, _interwal_odswiezania(entry)
