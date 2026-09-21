@@ -491,3 +491,114 @@ async def test_setup_maintenance_is_retryable(
     assert mock_config_entry.state.name == "SETUP_RETRY"
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
     assert not any(flow["context"]["source"] == config_entries.SOURCE_REAUTH for flow in flows)
+
+
+
+async def test_glowne_sensory_wystawiaja_spojne_dane(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Sprawdz podstawowe stany i atrybuty calego zestawu sensorow."""
+    today = _dzis().strftime("%Y-%m-%d")
+    mock_librus_client.async_get_messages.return_value = [
+        {
+            "author": "Sekretariat",
+            "title": "Informacja",
+            "date": today,
+            "href": "/message/1",
+            "unread": True,
+            "has_attachment": True,
+        }
+    ]
+    mock_librus_client.async_get_homework.return_value = [
+        SimpleNamespace(
+            subject="Matematyka",
+            category="Praca domowa",
+            teacher="Anna Nowak",
+            lesson="",
+            task_date=today,
+            completion_date=today,
+            href="/homework/1",
+        )
+    ]
+    mock_librus_client.async_get_schedule.return_value = [
+        {
+            "data": today,
+            "tydzien": "Poniedziałek",
+            "tytul": "Sprawdzian",
+            "przedmiot": "Matematyka",
+            "godzina": "08:00",
+            "numer_lekcji": 1,
+            "szczegoly": {},
+            "href": "/schedule/1",
+        }
+    ]
+
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    uczen = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "uczen")
+    ]
+    lucky = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "szczesliwy_numerek")
+    ]
+    oceny = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "oceny")
+    ]
+    wiadomosci = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "wiadomosci")
+    ]
+    zadania = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "zadania")
+    ]
+    terminarz = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "terminarz")
+    ]
+    srednia = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "srednia_ocen")
+    ]
+    matematyka = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "przedmiot_matematyka")
+    ]
+    srednia_matematyka = hass.states[
+        _entity_id(hass, "sensor", mock_config_entry, "srednia_matematyka")
+    ]
+
+    assert uczen.state == "Jan Kowalski"
+    assert uczen.attributes["klasa"] == "8A"
+    assert lucky.state == "13"
+    assert oceny.state == "1"
+    assert oceny.attributes["liczba_przedmiotow"] == 1
+    assert wiadomosci.state == "1"
+    assert wiadomosci.attributes["wiadomosci"][0]["ma_zalacznik"] is True
+    assert zadania.state == "1"
+    assert zadania.attributes["kategorie"] == {"Praca domowa": 1}
+    assert terminarz.state == "1"
+    assert terminarz.attributes["typy"] == {"Sprawdzian": 1}
+    assert srednia.state == "5.0"
+    assert matematyka.state == "5"
+    assert srednia_matematyka.state == "5.0"
+
+
+async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Zmiana danych coordinatora aktualizuje istniejace encje."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+    lucky_id = _entity_id(
+        hass, "sensor", mock_config_entry, "szczesliwy_numerek"
+    )
+    assert hass.states[lucky_id].state == "13"
+
+    mock_librus_client.async_get_student_information.return_value = SimpleNamespace(
+        name="Jan Kowalski",
+        class_name="8A",
+        number=7,
+        tutor="Anna Nowak",
+        school="SP nr 1",
+        lucky_number=21,
+    )
+
+    await mock_config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert hass.states[lucky_id].state == "21"
