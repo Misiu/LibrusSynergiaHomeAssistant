@@ -1,60 +1,97 @@
-"""Testy config flow Librus APIX."""
+"""Tests for the Librus APIX config flow."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from librus_apix.exceptions import AuthorizationError, MaintananceError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.librus_apix.config_flow import CannotConnect, InvalidAuth
 from custom_components.librus_apix.const import DOMAIN
 
 
 @pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
+def auto_enable_custom_integrations(enable_custom_integrations) -> None:
+    """Enable custom integrations."""
     return
 
 
-async def test_user_flow_tworzony_po_poprawnym_logowaniu(hass):
-    """Poprawne dane tworza wpis config entry."""
-    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "secret"}
+@pytest.fixture
+def librus_client() -> MagicMock:
+    """Return a mocked external Librus API client."""
+    client = MagicMock()
+    client.get_token.return_value = object()
+    return client
 
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(return_value={"title": "Librus APIX (123456)"}),
-    ):
-        result = await hass.config_entries.flow.async_init(
+
+async def _run_user_flow(
+    hass: HomeAssistant, client: MagicMock, password: str = "secret"
+):
+    data = {CONF_USERNAME: "123456", CONF_PASSWORD: password}
+    with patch("librus_apix.client.new_client", return_value=client):
+        return await hass.config_entries.flow.async_init(
             DOMAIN,
             context={"source": config_entries.SOURCE_USER},
             data=data,
         )
+
+
+async def test_user_flow_creates_entry(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Valid credentials create a config entry."""
+    result = await _run_user_flow(hass, librus_client)
 
     assert result["type"] is data_entry_flow.FlowResultType.CREATE_ENTRY
     assert result["title"] == "Librus APIX (123456)"
-    assert result["data"] == data
+    assert result["data"] == {
+        CONF_USERNAME: "123456",
+        CONF_PASSWORD: "secret",
+    }
 
 
-async def test_user_flow_blad_logowania_pokazuje_cannot_connect(hass):
-    """Nieudane logowanie wraca do formularza zamiast tworzyc wpis."""
-    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "bad"}
+async def test_user_flow_invalid_auth(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Rejected credentials return invalid_auth."""
+    librus_client.get_token.side_effect = AuthorizationError("bad credentials")
 
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=InvalidAuth()),
-    ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_USER},
-            data=data,
-        )
+    result = await _run_user_flow(hass, librus_client, "bad")
 
     assert result["type"] is data_entry_flow.FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
 
 
-async def test_user_flow_blokuje_drugi_wpis_dla_tego_samego_login(hass):
-    """Jedno konto Librus nie powinno zostac dodane dwa razy."""
+async def test_user_flow_cannot_connect(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Librus maintenance is treated as a connectivity problem."""
+    librus_client.get_token.side_effect = MaintananceError("maintenance")
+
+    result = await _run_user_flow(hass, librus_client)
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_user_flow_unknown_error(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Unexpected errors are reported separately."""
+    librus_client.get_token.side_effect = RuntimeError("boom")
+
+    result = await _run_user_flow(hass, librus_client)
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "unknown"}
+
+
+async def test_user_flow_blocks_duplicate_username(
+    hass: HomeAssistant,
+) -> None:
+    """The same Librus account cannot be configured twice."""
     existing = MockConfigEntry(
         domain=DOMAIN,
         title="Librus APIX (123456)",
@@ -72,9 +109,10 @@ async def test_user_flow_blokuje_drugi_wpis_dla_tego_samego_login(hass):
     assert result["reason"] == "already_configured"
 
 
-
-async def test_reauth_success_updates_password(hass):
-    """Reauth zachowuje login i aktualizuje tylko haslo."""
+async def test_reauth_success_updates_password(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Reauth keeps the username and updates the password."""
     existing = MockConfigEntry(
         domain=DOMAIN,
         title="Librus APIX (123456)",
@@ -82,10 +120,7 @@ async def test_reauth_success_updates_password(hass):
     )
     existing.add_to_hass(hass)
 
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(return_value={"title": "Librus APIX (123456)"}),
-    ):
+    with patch("librus_apix.client.new_client", return_value=librus_client):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={
@@ -108,19 +143,19 @@ async def test_reauth_success_updates_password(hass):
     assert existing.data[CONF_PASSWORD] == "new-secret"
 
 
-async def test_reauth_bad_password_keeps_form(hass):
-    """Niepoprawne nowe haslo nie konczy reauth."""
+async def test_reauth_invalid_password_keeps_form(
+    hass: HomeAssistant, librus_client: MagicMock
+) -> None:
+    """Rejected replacement password does not overwrite stored credentials."""
     existing = MockConfigEntry(
         domain=DOMAIN,
         title="Librus APIX (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
+    librus_client.get_token.side_effect = AuthorizationError("bad credentials")
 
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=InvalidAuth()),
-    ):
+    with patch("librus_apix.client.new_client", return_value=librus_client):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={
@@ -136,42 +171,5 @@ async def test_reauth_bad_password_keeps_form(hass):
 
     assert result["type"] is data_entry_flow.FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
-    assert result["errors"] == {"base": "cannot_connect"}
-    assert existing.data[CONF_PASSWORD] == "old-secret"
-
-
-
-async def test_user_flow_invalid_auth(hass):
-    """Odrzucone dane logowania maja osobny blad od awarii polaczenia."""
-    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "bad"}
-
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=InvalidAuth()),
-    ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_USER},
-            data=data,
-        )
-
-    assert result["type"] is data_entry_flow.FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
-
-
-async def test_user_flow_unknown_error(hass):
-    """Nieoczekiwany blad nie jest maskowany jako problem z haslem."""
-    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "secret"}
-
-    with patch(
-        "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=RuntimeError("boom")),
-    ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN,
-            context={"source": config_entries.SOURCE_USER},
-            data=data,
-        )
-
-    assert result["type"] is data_entry_flow.FlowResultType.FORM
-    assert result["errors"] == {"base": "unknown"}
+    assert existing.data[CONF_PASSWORD] == "old-secret"
