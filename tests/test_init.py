@@ -584,3 +584,51 @@ async def test_pelna_awaria_oznacza_encje_jako_unavailable(
 
     assert mock_config_entry.runtime_data.last_update_success is False
     assert hass.states.get(sensor_id).state == "unavailable"
+
+
+
+async def test_czesciowa_awaria_oznacza_tylko_powiazane_encje_unavailable(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Awaria wiadomosci nie moze zdejmowac ocen, planu ani kalendarza."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    messages_id = _entity_id(hass, "sensor", mock_config_entry, "wiadomosci")
+    grades_id = _entity_id(hass, "sensor", mock_config_entry, "oceny")
+    calendar_id = _entity_id(
+        hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
+    )
+
+    mock_librus_client.async_get_messages.return_value = None
+
+    await mock_config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.runtime_data.last_update_success is True
+    assert hass.states.get(messages_id).state == "unavailable"
+    assert hass.states.get(grades_id).state != "unavailable"
+    assert hass.states.get(calendar_id).state != "unavailable"
+
+
+async def test_awaria_timetable_oznacza_plan_i_calendar_unavailable(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Awaria timetable dotyczy sensorow planu i natywnego kalendarza."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    plan_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
+    next_id = _entity_id(
+        hass, "sensor", mock_config_entry, "nastepna_lekcja"
+    )
+    calendar_id = _entity_id(
+        hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
+    )
+
+    mock_librus_client.async_get_timetable.return_value = None
+
+    await mock_config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert hass.states.get(plan_id).state == "unavailable"
+    assert hass.states.get(next_id).state == "unavailable"
+    assert hass.states.get(calendar_id).state == "unavailable"
