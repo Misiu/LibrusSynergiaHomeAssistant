@@ -11,6 +11,7 @@ class LibrusEntity(CoordinatorEntity[LibrusDataUpdateCoordinator]):
     """Base class for Librus entities."""
 
     _attr_has_entity_name = True
+    _availability_key: str | None = None
 
     def __init__(
         self,
@@ -27,3 +28,12 @@ class LibrusEntity(CoordinatorEntity[LibrusDataUpdateCoordinator]):
             manufacturer="Librus",
             model="Synergia",
         )
+
+
+    @property
+    def available(self) -> bool:
+        """Return whether the data source for this entity is available."""
+        if not super().available or self._availability_key is None:
+            return super().available
+        availability = self.coordinator.data.get("availability", {})
+        return availability.get(self._availability_key, True)
