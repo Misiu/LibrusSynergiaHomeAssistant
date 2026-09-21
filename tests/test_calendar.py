@@ -147,3 +147,67 @@ def test_event_pomija_odwolana_lekcje_jako_najblizsza():
 
     assert calendar.event is not None
     assert calendar.event.summary == "Fizyka"
+
+
+
+async def test_async_get_events_ma_poprawne_granice_przedzialu():
+    """Lekcja konczaca sie na starcie okna ani zaczynajaca na koncu nie nalezy do okna."""
+    tz = dt_util.get_default_time_zone()
+    calendar = _calendar(
+        [
+            _lekcja(przedmiot="Przed", od="07:45", do="08:00"),
+            _lekcja(numer=2, przedmiot="Wewnatrz", od="08:00", do="08:45"),
+            _lekcja(numer=3, przedmiot="Po", od="09:00", do="09:45"),
+        ]
+    )
+
+    events = await calendar.async_get_events(
+        MagicMock(),
+        datetime(2026, 9, 21, 8, 0, tzinfo=tz),
+        datetime(2026, 9, 21, 9, 0, tzinfo=tz),
+    )
+
+    assert [event.summary for event in events] == ["Wewnatrz"]
+
+
+async def test_async_get_events_sortuje_plan():
+    """Kalendarz nie zalezy od kolejnosci wpisow zwroconych przez API."""
+    tz = dt_util.get_default_time_zone()
+    calendar = _calendar(
+        [
+            _lekcja(numer=2, przedmiot="Fizyka", od="09:00", do="09:45"),
+            _lekcja(numer=1, przedmiot="Matematyka", od="08:00", do="08:45"),
+        ]
+    )
+
+    events = await calendar.async_get_events(
+        MagicMock(),
+        datetime(2026, 9, 21, 0, 0, tzinfo=tz),
+        datetime(2026, 9, 22, 0, 0, tzinfo=tz),
+    )
+
+    assert [event.summary for event in events] == ["Matematyka", "Fizyka"]
+
+
+def test_event_zwraca_trwajaca_lekcje(freezer):
+    """Stan calendar wskazuje trwajaca lekcje przed kolejnymi wydarzeniami."""
+    freezer.move_to("2026-09-21 08:30:00")
+    calendar = _calendar(
+        [
+            _lekcja(przedmiot="Matematyka", od="08:00", do="08:45"),
+            _lekcja(numer=2, przedmiot="Fizyka", od="09:00", do="09:45"),
+        ]
+    )
+
+    assert calendar.event is not None
+    assert calendar.event.summary == "Matematyka"
+
+
+def test_event_none_gdy_plan_sie_skoczyl(freezer):
+    """Po wszystkich lekcjach calendar nie udaje aktywnego wydarzenia."""
+    freezer.move_to("2026-09-21 18:00:00")
+    calendar = _calendar(
+        [_lekcja(przedmiot="Matematyka", od="08:00", do="08:45")]
+    )
+
+    assert calendar.event is None
