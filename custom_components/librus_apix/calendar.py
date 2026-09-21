@@ -13,6 +13,8 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN
 from .coordinator import LibrusDataUpdateCoordinator
 
+PARALLEL_UPDATES = 0
+
 
 def _device_info(
     coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry
@@ -90,7 +92,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Skonfiguruj kalendarz planu lekcji."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
     async_add_entities([LibrusPlanLekcjiCalendar(coordinator, config_entry)])
 
 
