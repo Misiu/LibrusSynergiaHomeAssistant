@@ -86,7 +86,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
         self._seen_schedule_ids: set = set()
         self._seen_plan_ids: set = set()
         self._unavailable_sources: set[str] = set()
-        self._first_run: bool = True
+        self._initialized_sources: set[str] = set()
         super().__init__(
             hass,
             _LOGGER,
@@ -144,8 +144,6 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             prev = self.data or {}
 
             if grades is None:
-                if "oceny" not in prev:
-                    raise UpdateFailed("Nie udalo sie pobrac ocen i brak danych w cache")
                 grades = prev.get("oceny", [])
                 oceny_wg_przedmiotu = prev.get("oceny_wg_przedmiotu", {})
             else:
@@ -193,33 +191,14 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
                 "availability": availability,
             }
 
-            # Pierwsze pobranie - tylko zapamietaj stan, nie wysylaj powiadomien
-            if self._first_run:
-                self._first_run = False
-                for msg in wiadomosci:
-                    self._seen_message_hrefs.add(msg["href"])
-                for grade in grades:
-                    self._seen_grade_ids.add(
-                        (grade["subject"], grade["date"], grade["grade"])
-                    )
-                for zadanie in zadania:
-                    self._seen_homework_ids.add(
-                        (zadanie["przedmiot"], zadanie["termin"], zadanie["kategoria"])
-                    )
-                for zdarzenie in terminarz:
-                    self._seen_schedule_ids.add(
-                        (zdarzenie["data"], zdarzenie["tytul"], zdarzenie["przedmiot"])
-                    )
-                for lekcja in plan_lekcji:
-                    if lekcja["zastepstwo"] or lekcja["odwolana"]:
-                        self._seen_plan_ids.add(
-                            (lekcja["data"], lekcja["numer"], lekcja["info"])
-                        )
-            else:
-                self._fire_events(wiadomosci, grades)
-                self._fire_homework_events(zadania)
-                self._fire_schedule_events(terminarz)
-                self._fire_plan_events(plan_lekcji)
+            self._process_events(
+                availability,
+                wiadomosci,
+                grades,
+                zadania,
+                terminarz,
+                plan_lekcji,
+            )
 
             return result
 
@@ -227,6 +206,68 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             raise
         except Exception as err:
             raise UpdateFailed(f"Blad komunikacji z API: {err}") from err
+
+    def _process_events(
+        self,
+        availability: dict[str, bool],
+        messages: List[Dict],
+        grades: List[Dict],
+        homework: List[Dict],
+        schedule: List[Dict],
+        timetable: List[Dict],
+    ) -> None:
+        """Seed each source before emitting events from later updates."""
+        sources = {
+            "messages": (
+                messages,
+                lambda: self._seen_message_hrefs.update(
+                    msg["href"] for msg in messages if msg.get("href")
+                ),
+                lambda: self._fire_events(messages, []),
+            ),
+            "grades": (
+                grades,
+                lambda: self._seen_grade_ids.update(
+                    (grade["subject"], grade["date"], grade["grade"])
+                    for grade in grades
+                ),
+                lambda: self._fire_events([], grades),
+            ),
+            "homework": (
+                homework,
+                lambda: self._seen_homework_ids.update(
+                    (item["przedmiot"], item["termin"], item["kategoria"])
+                    for item in homework
+                ),
+                lambda: self._fire_homework_events(homework),
+            ),
+            "schedule": (
+                schedule,
+                lambda: self._seen_schedule_ids.update(
+                    (item["data"], item["tytul"], item["przedmiot"])
+                    for item in schedule
+                ),
+                lambda: self._fire_schedule_events(schedule),
+            ),
+            "timetable": (
+                timetable,
+                lambda: self._seen_plan_ids.update(
+                    (lesson["data"], lesson["numer"], lesson["info"])
+                    for lesson in timetable
+                    if lesson["zastepstwo"] or lesson["odwolana"]
+                ),
+                lambda: self._fire_plan_events(timetable),
+            ),
+        }
+
+        for source, (_data, seed, fire) in sources.items():
+            if not availability[source]:
+                continue
+            if source not in self._initialized_sources:
+                seed()
+                self._initialized_sources.add(source)
+            else:
+                fire()
 
     def _log_source_availability(self, availability: dict[str, bool]) -> None:
         """Log source availability transitions without repeating messages."""
