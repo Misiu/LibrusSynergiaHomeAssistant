@@ -69,3 +69,71 @@ async def test_user_flow_blokuje_drugi_wpis_dla_tego_samego_login(hass):
 
     assert result["type"] is data_entry_flow.FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+
+
+
+async def test_reauth_success_updates_password(hass):
+    """Reauth zachowuje login i aktualizuje tylko haslo."""
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        title="Librus APIX (123456)",
+        data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
+    )
+    existing.add_to_hass(hass)
+
+    with patch(
+        "custom_components.librus_apix.config_flow.validate_input",
+        AsyncMock(return_value={"title": "Librus APIX (123456)"}),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_REAUTH,
+                "entry_id": existing.entry_id,
+            },
+            data=dict(existing.data),
+        )
+        assert result["type"] is data_entry_flow.FlowResultType.FORM
+        assert result["step_id"] == "reauth_confirm"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "new-secret"},
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert existing.data[CONF_USERNAME] == "123456"
+    assert existing.data[CONF_PASSWORD] == "new-secret"
+
+
+async def test_reauth_bad_password_keeps_form(hass):
+    """Niepoprawne nowe haslo nie konczy reauth."""
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        title="Librus APIX (123456)",
+        data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
+    )
+    existing.add_to_hass(hass)
+
+    with patch(
+        "custom_components.librus_apix.config_flow.validate_input",
+        AsyncMock(side_effect=ValueError("Cannot connect")),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_REAUTH,
+                "entry_id": existing.entry_id,
+            },
+            data=dict(existing.data),
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_PASSWORD: "still-bad"},
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+    assert result["errors"] == {"base": "cannot_connect"}
+    assert existing.data[CONF_PASSWORD] == "old-secret"
