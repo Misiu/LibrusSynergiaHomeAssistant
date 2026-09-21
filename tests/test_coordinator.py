@@ -5,6 +5,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from librus_apix.exceptions import AuthorizationError
@@ -48,13 +50,15 @@ def _client():
         (date(2027, 7, 1), 2),
     ],
 )
-def test_current_semester(freezer, day, expected):
+def test_current_semester(
+    freezer: FrozenDateTimeFactory, day: date, expected: int
+) -> None:
     """Styczen nadal nalezy do pierwszego semestru."""
     freezer.move_to(day)
     assert _current_semester() == expected
 
 
-async def test_pierwszy_blad_ocen_bez_cache_powoduje_update_failed(hass):
+async def test_pierwszy_blad_ocen_bez_cache_powoduje_update_failed(hass: HomeAssistant) -> None:
     """Pierwsze pobranie nie moze udawac sukcesu bez danych o ocenach."""
     entry = _entry()
     client = _client()
@@ -65,7 +69,7 @@ async def test_pierwszy_blad_ocen_bez_cache_powoduje_update_failed(hass):
         await coordinator._async_update_data()
 
 
-async def test_pusty_cache_ocen_jest_poprawnym_cache(hass):
+async def test_pusty_cache_ocen_jest_poprawnym_cache(hass: HomeAssistant) -> None:
     """Uczen bez ocen nie traci dostepnosci przy chwilowym bledzie ocen."""
     entry = _entry()
     client = _client()
@@ -95,7 +99,7 @@ async def test_pusty_cache_ocen_jest_poprawnym_cache(hass):
     assert result["plan_lekcji"] == []
 
 
-async def test_czesciowy_blad_zachowuje_cache_innych_endpointow(hass):
+async def test_czesciowy_blad_zachowuje_cache_innych_endpointow(hass: HomeAssistant) -> None:
     """Awaria pojedynczych endpointow nie zeruje ostatnich poprawnych danych."""
     entry = _entry()
     client = _client()
@@ -144,7 +148,7 @@ async def test_czesciowy_blad_zachowuje_cache_innych_endpointow(hass):
     assert result["plan_lekcji"] is cached_plan
 
 
-async def test_coordinator_jest_powiazany_z_config_entry(hass):
+async def test_coordinator_jest_powiazany_z_config_entry(hass: HomeAssistant) -> None:
     """HA 2026.9 powinien dostac config_entry jawnie w coordinatorze."""
     entry = _entry()
     coordinator = LibrusDataUpdateCoordinator(hass, entry, _client())
@@ -154,7 +158,7 @@ async def test_coordinator_jest_powiazany_z_config_entry(hass):
 
 
 
-async def test_auth_rejection_przerywa_dalsze_endpointy(hass):
+async def test_auth_rejection_przerywa_dalsze_endpointy(hass: HomeAssistant) -> None:
     """Po bledzie autoryzacji coordinator nie wykonuje kolejnych zapytan."""
     entry = _entry()
     client = _client()
@@ -174,7 +178,7 @@ async def test_auth_rejection_przerywa_dalsze_endpointy(hass):
 
 
 
-async def test_pelna_awaria_z_cache_nadal_jest_update_failed(hass):
+async def test_pelna_awaria_z_cache_nadal_jest_update_failed(hass: HomeAssistant) -> None:
     """Stary cache nie moze maskowac calkowitej awarii Librusa."""
     entry = _entry()
     client = _client()
