@@ -25,5 +25,47 @@
     "abort": {
       "already_configured": "Device is already configured"
     }
+  },
+  "entity": {
+    "sensor": {
+      "student_information": {
+        "name": "Student information"
+      },
+      "lucky_number": {
+        "name": "Lucky number"
+      },
+      "grades": {
+        "name": "Grades"
+      },
+      "subject_grades": {
+        "name": "{subject}"
+      },
+      "average_grade": {
+        "name": "Average grade"
+      },
+      "subject_average": {
+        "name": "Average {subject}"
+      },
+      "schedule": {
+        "name": "Schedule"
+      },
+      "homework": {
+        "name": "Homework"
+      },
+      "lesson_timetable": {
+        "name": "Lesson timetable"
+      },
+      "next_lesson": {
+        "name": "Next lesson"
+      },
+      "messages": {
+        "name": "Messages"
+      }
+    },
+    "calendar": {
+      "lesson_timetable": {
+        "name": "Lesson timetable"
+      }
+    }
   }
 }
