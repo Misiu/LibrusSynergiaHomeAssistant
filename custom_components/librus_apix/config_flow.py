@@ -149,4 +149,47 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={"username": username},
         )
+    async def async_step_reconfigure(
+        self, user_input: dict[str, str] | None = None
+    ) -> ConfigFlowResult:
+        """Allow the user to proactively update Librus credentials."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+        username = entry.data[CONF_USERNAME]
+
+        if user_input is not None:
+            new_data = {
+                CONF_USERNAME: username,
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            try:
+                await validate_input(self.hass, new_data)
+            except InvalidAuth:
+                errors["base"] = "invalid_auth"
+            except CannotConnect:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during reconfiguration")
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PASSWORD): TextSelector(
+                        TextSelectorConfig(
+                            type=TextSelectorType.PASSWORD,
+                            autocomplete="current-password",
+                        )
+                    )
+                }
+            ),
+            errors=errors,
+            description_placeholders={"username": username},
+        )
 
