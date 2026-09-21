@@ -6,8 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant import config_entries
+from homeassistant.components.homeassistant import (
+    DOMAIN as HOMEASSISTANT_DOMAIN,
+    SERVICE_UPDATE_ENTITY,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -699,9 +704,11 @@ async def test_homeassistant_update_entity_refreshes_shared_coordinator(
         lucky_number=42,
     )
 
+    assert await async_setup_component(hass, HOMEASSISTANT_DOMAIN, {})
+
     await hass.services.async_call(
-        "homeassistant",
-        "update_entity",
+        HOMEASSISTANT_DOMAIN,
+        SERVICE_UPDATE_ENTITY,
         {"entity_id": plan_id},
         blocking=True,
     )
