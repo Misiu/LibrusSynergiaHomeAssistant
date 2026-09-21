@@ -276,7 +276,7 @@ async def test_domyslny_interwal_odswiezania(
     hass: HomeAssistant, mock_config_entry, mock_librus_client
 ):
     """Bez opcji koordynator odswieza sie co 2 godziny."""
-    from custom_components.librus_apix.sensor import _interwal_odswiezania
+    from custom_components.librus_apix.coordinator import _interwal_odswiezania
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -287,7 +287,7 @@ async def test_interwal_z_opcji_integracji(
     hass: HomeAssistant, mock_config_entry, mock_librus_client
 ):
     """Opcja z UI zmienia czestotliwosc odpytywania Librusa."""
-    from custom_components.librus_apix.sensor import _interwal_odswiezania
+    from custom_components.librus_apix.coordinator import _interwal_odswiezania
 
     mock_config_entry.add_to_hass(hass)
     hass.config_entries.async_update_entry(
@@ -301,7 +301,7 @@ async def test_interwal_zapisany_jako_float(
     hass: HomeAssistant, mock_config_entry
 ):
     """NumberSelector zapisuje liczbe zmiennoprzecinkowa (45.0), nie int."""
-    from custom_components.librus_apix.sensor import _interwal_odswiezania
+    from custom_components.librus_apix.coordinator import _interwal_odswiezania
 
     mock_config_entry.add_to_hass(hass)
     hass.config_entries.async_update_entry(
@@ -315,7 +315,7 @@ async def test_interwal_odporny_na_smieciowa_wartosc(
     hass: HomeAssistant, mock_config_entry
 ):
     """Nieparsowalna wartosc nie wywala integracji - wracamy do domyslnej."""
-    from custom_components.librus_apix.sensor import _interwal_odswiezania
+    from custom_components.librus_apix.coordinator import _interwal_odswiezania
 
     mock_config_entry.add_to_hass(hass)
     hass.config_entries.async_update_entry(
@@ -349,3 +349,28 @@ async def test_koordynator_uzywa_interwalu_z_opcji(
         if e.entity_id.endswith("_plan_lekcji")
     )
     assert encja.coordinator.update_interval == timedelta(minutes=45)
+
+
+
+async def test_sensor_i_calendar_uzywaja_tego_samego_koordynatora(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Sensor i kalendarz nie moga wykonywac osobnych cykli odpytywania Librusa."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    sensor_component = hass.data["entity_components"]["sensor"]
+    calendar_component = hass.data["entity_components"]["calendar"]
+
+    sensor_entity = next(
+        entity
+        for entity in sensor_component.entities
+        if entity.unique_id == f"{mock_config_entry.entry_id}_plan_lekcji"
+    )
+    calendar_entity = next(
+        entity
+        for entity in calendar_component.entities
+        if entity.unique_id == f"{mock_config_entry.entry_id}_plan_lekcji_calendar"
+    )
+
+    assert sensor_entity.coordinator is calendar_entity.coordinator
+    assert mock_librus_client.async_get_timetable.await_count == 1
