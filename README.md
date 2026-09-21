@@ -597,9 +597,9 @@ automation:
 ## 🛠️ Rozwój
 
 ### Wymagania
-- Python 3.9+
-- Home Assistant 2023.1+
-- librus-apix library
+- Python 3.14.2+
+- Home Assistant 2026.9.3+
+- librus-apix 1.5.2
 
 ### Setup środowiska deweloperskiego
 ```bash
@@ -615,7 +615,7 @@ docker-compose up -d
 
 ### Uruchomienie testów
 ```bash
-pytest tests/
+python -m pytest -q
 ```
 
 ## 📝 Logi
@@ -630,10 +630,47 @@ logger:
 
 ## ⚠️ Bezpieczeństwo
 
-- **Nie udostępniaj swoich danych logowania!**  
-- Dane są przechowywane lokalnie w Home Assistant
-- Komunikacja z Librus odbywa się przez bezpieczne API
-- Hasła są zaszyfrowane w konfiguracji
+- **Nie udostępniaj swoich danych logowania.**
+- Dane logowania są przechowywane w config entry Home Assistanta; chroń katalog
+  konfiguracji oraz kopie zapasowe.
+- Diagnostyka integracji usuwa login i hasło przed wygenerowaniem pliku.
+- Połączenia z Librus Synergia są wykonywane przez HTTPS.
+
+## 🔎 Diagnostyka
+
+W **Ustawienia → Urządzenia i usługi → Librus Synergia HA** można pobrać
+diagnostykę wpisu integracji. Plik zawiera status coordinatora, dostępność
+poszczególnych źródeł i liczniki danych, ale nie zawiera loginu, hasła,
+nazwiska ucznia ani treści wiadomości.
+
+## ⚠️ Znane ograniczenia
+
+- Librus jest usługą chmurową bez mechanizmu push, dlatego dane są pobierane
+  cyklicznie co 2 godziny.
+- Plan lekcji obejmuje bieżący i następny tydzień udostępniony przez Librusa.
+- Terminarz obejmuje bieżący i następny miesiąc.
+- Integracja celowo nie pobiera pełnej treści wiadomości, aby ich odczyt nie
+  oznaczał wiadomości jako przeczytanych.
+- Biblioteka `librus-apix` jest synchroniczna, więc wywołania HTTP są
+  wykonywane poza pętlą asyncio Home Assistanta.
+
+## 🧰 Rozwiązywanie problemów
+
+1. Jeśli encje są `unavailable`, sprawdź najpierw, czy strona Librus Synergia
+   działa i czy nie trwa przerwa techniczna.
+2. Jeśli dane logowania zostaną odrzucone, Home Assistant uruchomi reautoryzację
+   i poprosi o aktualne hasło.
+3. Pobierz diagnostykę integracji i sprawdź pole `data_sources_available`.
+4. W razie potrzeby włącz logowanie debug opisane poniżej i dołącz logi do issue,
+   po usunięciu danych osobowych.
+
+## 🗑️ Usuwanie integracji
+
+1. Otwórz **Ustawienia → Urządzenia i usługi → Librus Synergia HA**.
+2. Otwórz menu wpisu integracji i wybierz **Usuń**.
+3. Jeśli integracja została zainstalowana przez HACS i nie będzie już używana,
+   można ją następnie odinstalować również z HACS.
+4. Po usunięciu wpisu dane logowania nie są już używane przez integrację.
 
 ## 🐛 Zgłaszanie błędów
 
