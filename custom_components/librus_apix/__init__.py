@@ -17,21 +17,11 @@ from librus_apix.client import Client, new_client
 from librus_apix.exceptions import TokenError
 
 from .const import DOMAIN, SCAN_INTERVAL
-from .coordinator import LibrusDataUpdateCoordinator, _interwal_odswiezania
+from .coordinator import LibrusDataUpdateCoordinator, _current_semester, _interwal_odswiezania
 from .plan_lekcji import DNI_TYGODNIA_PL, przetworz_plan
 
 _LOGGER = logging.getLogger(__name__)
 
-
-def _current_semester() -> int:
-    """Zwroc numer biezacego semestru (1 lub 2) wg polskiego roku szkolnego.
-
-    Semestr 1: wrzesien (9) - styczen (1)
-    Semestr 2: luty (2) - czerwiec (6)
-    Lipiec-sierpien to wakacje - zwracamy 2 (ostatni semestr roku).
-    """
-    m = date.today().month
-    return 1 if m >= 9 else 2
 
 PLATFORMS = ["sensor", "calendar"]
 
@@ -415,12 +405,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
     
     coordinator = LibrusDataUpdateCoordinator(
-        hass, client, _interwal_odswiezania(entry)
+        hass, entry, client, _interwal_odswiezania(entry)
     )
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     # Sensor i calendar korzystaja z tej samej instancji koordynatora.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -430,9 +419,4 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-    
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
