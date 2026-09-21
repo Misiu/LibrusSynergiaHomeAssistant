@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from freezegun.api import FrozenDateTimeFactory
+
 from homeassistant.util import dt as dt_util
 
 from custom_components.librus_apix.calendar import (
@@ -189,7 +191,7 @@ async def test_async_get_events_sortuje_plan():
     assert [event.summary for event in events] == ["Matematyka", "Fizyka"]
 
 
-def test_event_zwraca_trwajaca_lekcje(freezer):
+def test_event_zwraca_trwajaca_lekcje(freezer: FrozenDateTimeFactory) -> None:
     """Stan calendar wskazuje trwajaca lekcje przed kolejnymi wydarzeniami."""
     freezer.move_to("2026-09-21 08:30:00")
     calendar = _calendar(
@@ -203,7 +205,7 @@ def test_event_zwraca_trwajaca_lekcje(freezer):
     assert calendar.event.summary == "Matematyka"
 
 
-def test_event_none_gdy_plan_sie_skoczyl(freezer):
+def test_event_none_gdy_plan_sie_skoczyl(freezer: FrozenDateTimeFactory) -> None:
     """Po wszystkich lekcjach calendar nie udaje aktywnego wydarzenia."""
     freezer.move_to("2026-09-21 18:00:00")
     calendar = _calendar(
