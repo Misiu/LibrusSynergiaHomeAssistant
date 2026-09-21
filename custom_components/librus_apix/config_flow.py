@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
-from librus_apix.client import new_client
+from librus_apix import client as librus_client
 from librus_apix.exceptions import AuthorizationError, MaintananceError
 from librus_apix.exceptions import AuthorizationError, MaintananceError
 
@@ -50,7 +50,7 @@ async def validate_input(
     password = data[CONF_PASSWORD]
 
     try:
-        client = await hass.async_add_executor_job(new_client)
+        client = await hass.async_add_executor_job(librus_client.new_client)
         token = await hass.async_add_executor_job(
             client.get_token, username, password
         )
