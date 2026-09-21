@@ -15,6 +15,13 @@
         "data": {
           "password": "Hasło"
         }
+      },
+      "reconfigure": {
+        "title": "Ponowna konfiguracja Librusa",
+        "description": "Zaktualizuj hasło dla konta Librus {username}.",
+        "data": {
+          "password": "Hasło"
+        }
       }
     },
     "error": {
