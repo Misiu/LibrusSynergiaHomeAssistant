@@ -370,3 +370,18 @@ def test_limit_liczony_po_odfiltrowaniu_zakonczonych_dni():
     assert len(dni) == 5
     assert list(dni)[0] == "2026-09-08"
     assert list(dni)[-1] == "2026-09-12"
+
+
+
+def test_plan_helpers_reject_invalid_values() -> None:
+    """Helper parsers reject malformed Librus values safely."""
+    from custom_components.librus_apix.plan_lekcji import (
+        _data_iso,
+        _numer_lekcji,
+        _polacz,
+    )
+
+    assert _polacz("2026-09-21", "bad") is None
+    assert _numer_lekcji(True) is None
+    assert _numer_lekcji(" 4 ") == 4
+    assert _data_iso("not-a-date") is None

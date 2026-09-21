@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.2"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - name: Install test dependencies
+        run: pip install -r requirements_test.txt
+      - name: Ruff check
+        run: ruff check --select E9,F custom_components/librus_apix tests
+      - name: Compile integration
+        run: python -m compileall -q custom_components/librus_apix tests
+      - name: Run tests
+        run: python -m pytest -q --cov=custom_components/librus_apix --cov-report=term-missing --cov-fail-under=95

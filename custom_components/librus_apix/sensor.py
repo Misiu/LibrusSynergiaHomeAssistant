@@ -1,27 +1,17 @@
 """Platforma czujników dla integracji Librus APIX."""
 
-import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
-)
 
-from .const import (
-    CONF_SCAN_INTERVAL_MINUTES,
-    DEFAULT_PLAN_DAYS,
-    DEFAULT_SCAN_INTERVAL_MINUTES,
-    DOMAIN,
-)
+from .const import DEFAULT_PLAN_DAYS
+from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
+from .entity import LibrusEntity
 from .plan_lekcji import (
     biezacy_dzien,
     dni_do_wyswietlenia,
@@ -30,40 +20,8 @@ from .plan_lekcji import (
     polacz_z_wydarzeniami,
 )
 
-_LOGGER = logging.getLogger(__name__)
+PARALLEL_UPDATES = 0
 
-
-def _interwal_odswiezania(config_entry: ConfigEntry) -> timedelta:
-    """Odczytaj czestotliwosc odpytywania Librusa z opcji integracji."""
-    minuty = config_entry.options.get(
-        CONF_SCAN_INTERVAL_MINUTES, DEFAULT_SCAN_INTERVAL_MINUTES
-    )
-    try:
-        minuty = int(minuty)
-    except (TypeError, ValueError):
-        minuty = DEFAULT_SCAN_INTERVAL_MINUTES
-    return timedelta(minutes=max(1, minuty))
-
-
-def _jest_nowa(date_str: str) -> bool:
-    """Sprawdz czy data miesci sie w ostatnich 24 godzinach (dzis lub wczoraj)."""
-    if not date_str:
-        return False
-    wczoraj = date.today() - timedelta(days=1)
-    for fmt in (
-        "%d.%m.%Y %H:%M:%S",
-        "%d.%m.%Y %H:%M",
-        "%d.%m.%Y",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%d",
-    ):
-        try:
-            d = datetime.strptime(date_str.strip(), fmt).date()
-            return d >= wczoraj
-        except ValueError:
-            continue
-    return False
 
 
 def _srednia_ocen(oceny: List[Dict]) -> Optional[float]:
@@ -86,16 +44,11 @@ def _srednia_ocen(oceny: List[Dict]) -> Optional[float]:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: LibrusConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Konfiguracja platformy czujnikow Librus APIX."""
-    client = hass.data[DOMAIN][config_entry.entry_id]
-
-    coordinator = LibrusDataUpdateCoordinator(
-        hass, client, _interwal_odswiezania(config_entry)
-    )
-    await coordinator.async_config_entry_first_refresh()
+    coordinator = config_entry.runtime_data
 
     entities: List[SensorEntity] = [
         LibrusUczenSensor(coordinator, config_entry),
@@ -106,293 +59,40 @@ async def async_setup_entry(
         LibrusTerminarzSensor(coordinator, config_entry),
         LibrusPlanLekcjiSensor(coordinator, config_entry),
         LibrusNastepnaLekcjaSensor(coordinator, config_entry),
+        LibrusSredniaOcenSensor(coordinator, config_entry),
     ]
-
-    # Tworz czujniki per przedmiot na podstawie pierwszego pobrania danych
-    for subject in coordinator.data.get("oceny_wg_przedmiotu", {}).keys():
-        entities.append(LibrusPrzedmiotSensor(coordinator, subject, config_entry))
-        entities.append(LibrusSredniaPrzedmiotuSensor(coordinator, subject, config_entry))
-
-    # Czujnik globalnej sredniej
-    entities.append(LibrusSredniaOcenSensor(coordinator, config_entry))
-
     async_add_entities(entities)
 
+    known_subjects: set[str] = set()
 
-EVENT_NOWA_WIADOMOSC = f"{DOMAIN}_nowa_wiadomosc"
-EVENT_NOWA_OCENA = f"{DOMAIN}_nowa_ocena"
-EVENT_NOWE_ZADANIE = f"{DOMAIN}_nowe_zadanie"
-EVENT_NOWE_ZDARZENIE = f"{DOMAIN}_nowe_zdarzenie"
-EVENT_ZMIANA_PLANU = f"{DOMAIN}_zmiana_planu"
-
-
-class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
-    """Klasa zarzadzajaca pobieraniem danych z Librus."""
-
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        client: Any,
-        update_interval: timedelta,
-    ) -> None:
-        """Inicjalizacja koordynatora."""
-        self.client = client
-        self._seen_message_hrefs: set = set()
-        self._seen_grade_ids: set = set()
-        self._seen_homework_ids: set = set()
-        self._seen_schedule_ids: set = set()
-        self._seen_plan_ids: set = set()
-        self._first_run: bool = True
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=update_interval,
+    @callback
+    def _add_subject_entities() -> None:
+        """Dodaj encje dla przedmiotow, ktore pojawily sie po setupie."""
+        subjects = set(
+            (coordinator.data or {}).get("oceny_wg_przedmiotu", {})
         )
+        new_subjects = sorted(subjects - known_subjects)
+        if not new_subjects:
+            return
 
-    async def _async_update_data(self) -> Dict[str, Any]:
-        """Pobierz aktualne dane z API Librus."""
-        from datetime import date as _date
-        current_sem = 1 if _date.today().month >= 9 else 2
-
-        try:
-            student_info = await self.client.async_get_student_information()
-            grades = await self.client.async_get_grades()
-            messages = await self.client.async_get_messages(count=10)
-            homework_raw = await self.client.async_get_homework()
-            schedule_raw = await self.client.async_get_schedule()
-            plan_raw = await self.client.async_get_timetable()
-
-            if grades is None:
-                # Zachowaj poprzednie dane o ocenach jesli dostepne, wiadomosci zaktualizuj jesli OK
-                prev = self.data or {}
-                if not prev.get("oceny"):
-                    raise UpdateFailed("Nie udalo sie pobrac ocen i brak danych w cache")
-                _LOGGER.warning("Nie udalo sie pobrac ocen - uzywam poprzednich danych z cache")
-                return {
-                    "student_info": student_info or prev.get("student_info"),
-                    "oceny": prev.get("oceny", []),
-                    "oceny_wg_przedmiotu": prev.get("oceny_wg_przedmiotu", {}),
-                    "wiadomosci": (
-                        self._build_wiadomosci(messages)
-                        if messages is not None
-                        else prev.get("wiadomosci", [])
+        subject_entities: List[SensorEntity] = []
+        for subject in new_subjects:
+            subject_entities.extend(
+                [
+                    LibrusPrzedmiotSensor(coordinator, subject, config_entry),
+                    LibrusSredniaPrzedmiotuSensor(
+                        coordinator, subject, config_entry
                     ),
-                    "zadania": (
-                        self._build_zadania(homework_raw)
-                        if homework_raw is not None
-                        else prev.get("zadania", [])
-                    ),
-                    "terminarz": (
-                        schedule_raw
-                        if schedule_raw is not None
-                        else prev.get("terminarz", [])
-                    ),
-                    "plan_lekcji": (
-                        plan_raw
-                        if plan_raw is not None
-                        else prev.get("plan_lekcji", [])
-                    ),
-                }
-
-            # Grupuj oceny wg przedmiotu i oznacz nowe
-            oceny_wg_przedmiotu: Dict[str, List[Dict]] = {}
-            for grade in grades:
-                subject = grade["subject"]
-                if subject not in oceny_wg_przedmiotu:
-                    oceny_wg_przedmiotu[subject] = []
-                oceny_wg_przedmiotu[subject].append({
-                    "ocena": grade["grade"],
-                    "data": grade["date"],
-                    "kategoria": grade["category"],
-                    "nauczyciel": grade["teacher"],
-                    "semestr": grade.get("semester"),
-                    "jest_nowa": _jest_nowa(grade["date"]),
-                })
-
-            wiadomosci = self._build_wiadomosci(messages)
-            zadania = self._build_zadania(homework_raw)
-            terminarz = schedule_raw if schedule_raw is not None else []
-            plan_lekcji = plan_raw if plan_raw is not None else []
-
-            result = {
-                "student_info": student_info,
-                "oceny": grades,
-                "oceny_wg_przedmiotu": oceny_wg_przedmiotu,
-                "wiadomosci": wiadomosci,
-                "zadania": zadania,
-                "terminarz": terminarz,
-                "plan_lekcji": plan_lekcji,
-                "semestr_biezacy": current_sem,
-            }
-
-            # Pierwsze pobranie - tylko zapamietaj stan, nie wysylaj powiadomien
-            if self._first_run:
-                self._first_run = False
-                for msg in wiadomosci:
-                    self._seen_message_hrefs.add(msg["href"])
-                for grade in grades:
-                    self._seen_grade_ids.add(
-                        (grade["subject"], grade["date"], grade["grade"])
-                    )
-                for zadanie in zadania:
-                    self._seen_homework_ids.add(
-                        (zadanie["przedmiot"], zadanie["termin"], zadanie["kategoria"])
-                    )
-                for zdarzenie in terminarz:
-                    self._seen_schedule_ids.add(
-                        (zdarzenie["data"], zdarzenie["tytul"], zdarzenie["przedmiot"])
-                    )
-                for lekcja in plan_lekcji:
-                    if lekcja["zastepstwo"] or lekcja["odwolana"]:
-                        self._seen_plan_ids.add(
-                            (lekcja["data"], lekcja["numer"], lekcja["info"])
-                        )
-            else:
-                self._fire_events(wiadomosci, grades)
-                self._fire_homework_events(zadania)
-                self._fire_schedule_events(terminarz)
-                self._fire_plan_events(plan_lekcji)
-
-            return result
-
-        except UpdateFailed:
-            raise
-        except Exception as err:
-            raise UpdateFailed(f"Blad komunikacji z API: {err}") from err
-
-    def _fire_events(self, messages: List[Dict], grades: List[Dict]) -> None:
-        """Wyslij zdarzenia HA dla nowych wiadomosci i ocen."""
-        for msg in messages:
-            href = msg.get("href", "")
-            if href and href not in self._seen_message_hrefs:
-                self._seen_message_hrefs.add(href)
-                _LOGGER.debug("Nowa wiadomosc: %s", msg.get("title"))
-                self.hass.bus.fire(
-                    EVENT_NOWA_WIADOMOSC,
-                    {
-                        "nadawca": msg.get("author", ""),
-                        "temat": msg.get("title", ""),
-                        "data": msg.get("date", ""),
-                        "ma_zalacznik": msg.get("has_attachment", False),
-                    },
-                )
-
-        for grade in grades:
-            grade_id = (grade["subject"], grade["date"], grade["grade"])
-            if grade_id not in self._seen_grade_ids:
-                self._seen_grade_ids.add(grade_id)
-                _LOGGER.debug("Nowa ocena: %s %s", grade["subject"], grade["grade"])
-                self.hass.bus.fire(
-                    EVENT_NOWA_OCENA,
-                    {
-                        "przedmiot": grade["subject"],
-                        "ocena": grade["grade"],
-                        "data": grade["date"],
-                        "kategoria": grade["category"],
-                        "nauczyciel": grade["teacher"],
-                    },
-                )
-
-    def _fire_schedule_events(self, terminarz: List[Dict]) -> None:
-        """Wyslij zdarzenia HA dla nowych zdarzen w kalendarzu."""
-        for zdarzenie in terminarz:
-            ev_id = (zdarzenie["data"], zdarzenie["tytul"], zdarzenie["przedmiot"])
-            if ev_id not in self._seen_schedule_ids:
-                self._seen_schedule_ids.add(ev_id)
-                _LOGGER.debug("Nowe zdarzenie: %s %s %s", zdarzenie["data"], zdarzenie["przedmiot"], zdarzenie["tytul"])
-                self.hass.bus.fire(
-                    EVENT_NOWE_ZDARZENIE,
-                    {
-                        "data": zdarzenie["data"],
-                        "tytul": zdarzenie["tytul"],
-                        "przedmiot": zdarzenie["przedmiot"],
-                        "godzina": zdarzenie["godzina"],
-                    },
-                )
-
-    def _fire_plan_events(self, plan: List[Dict]) -> None:
-        """Wyslij zdarzenia HA dla nowych zastepstw i odwolanych lekcji."""
-        for lekcja in plan:
-            if not (lekcja["zastepstwo"] or lekcja["odwolana"]):
-                continue
-            plan_id = (lekcja["data"], lekcja["numer"], lekcja["info"])
-            if plan_id in self._seen_plan_ids:
-                continue
-            self._seen_plan_ids.add(plan_id)
-            _LOGGER.debug(
-                "Zmiana w planie: %s lekcja %s - %s",
-                lekcja["data"], lekcja["numer"], lekcja["info"],
-            )
-            self.hass.bus.fire(
-                EVENT_ZMIANA_PLANU,
-                {
-                    "data": lekcja["data"],
-                    "dzien_tygodnia": lekcja["dzien_tygodnia"],
-                    "numer": lekcja["numer"],
-                    "przedmiot": lekcja["przedmiot"],
-                    "od": lekcja["od"],
-                    "do": lekcja["do"],
-                    "rodzaj": "odwolana" if lekcja["odwolana"] else "zastepstwo",
-                    "info": lekcja["info"],
-                },
+                ]
             )
 
-    def _build_wiadomosci(self, messages: Optional[List[Dict]]) -> List[Dict]:
-        """Oznacz nowe wiadomosci i zwroc liste."""
-        result = []
-        for msg in messages or []:
-            msg["jest_nowa"] = _jest_nowa(msg.get("date", ""))
-            result.append(msg)
-        return result
+        known_subjects.update(new_subjects)
+        async_add_entities(subject_entities)
 
-    def _build_zadania(self, homework_raw) -> List[Dict]:
-        """Przetworz liste Homework na liste dict, posortowana po terminie."""
-        if not homework_raw:
-            return []
-        zadania = [
-            {
-                "przedmiot": hw.subject,
-                "kategoria": hw.category,
-                "nauczyciel": hw.teacher,
-                "lekcja": hw.lesson,
-                "data_zadania": hw.task_date,
-                "termin": hw.completion_date,
-                "href": hw.href,
-            }
-            for hw in homework_raw
-        ]
-        return sorted(zadania, key=lambda z: z["termin"])
-
-    def _fire_homework_events(self, zadania: List[Dict]) -> None:
-        """Wyslij zdarzenia HA dla nowych zadan/sprawdzianow."""
-        for zadanie in zadania:
-            hw_id = (zadanie["przedmiot"], zadanie["termin"], zadanie["kategoria"])
-            if hw_id not in self._seen_homework_ids:
-                self._seen_homework_ids.add(hw_id)
-                _LOGGER.debug("Nowe zadanie: %s %s", zadanie["przedmiot"], zadanie["kategoria"])
-                self.hass.bus.fire(
-                    EVENT_NOWE_ZADANIE,
-                    {
-                        "przedmiot": zadanie["przedmiot"],
-                        "kategoria": zadanie["kategoria"],
-                        "termin": zadanie["termin"],
-                        "nauczyciel": zadanie["nauczyciel"],
-                    },
-                )
-
-
-def _device_info(coordinator: DataUpdateCoordinator, config_entry: ConfigEntry) -> Dict[str, Any]:
-    """Zwroc informacje o urzadzeniu."""
-    data = coordinator.data or {}
-    student_info = data.get("student_info")
-    name = student_info.name if student_info else "Librus"
-    return {
-        "identifiers": {(DOMAIN, config_entry.entry_id)},
-        "name": f"Librus - {name}",
-        "manufacturer": "Librus",
-        "model": "Synergia",
-    }
+    _add_subject_entities()
+    config_entry.async_on_unload(
+        coordinator.async_add_listener(_add_subject_entities)
+    )
 
 
 def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
@@ -404,21 +104,16 @@ def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in lekcja.items() if k not in ("przerwa_od", "przerwa_do")}
 
 
-class LibrusUczenSensor(CoordinatorEntity, SensorEntity):
+class LibrusUczenSensor(LibrusEntity, SensorEntity):
     """Czujnik z informacjami o uczniu."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Informacje o uczniu"
-        self._attr_unique_id = f"{config_entry.entry_id}_uczen"
-        self._attr_icon = "mdi:account-school"
+    _availability_key = "student_info"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "student_information"
+        self._attr_unique_id = f"{config_entry.entry_id}_uczen"
 
     @property
     def native_value(self) -> Optional[str]:
@@ -439,21 +134,16 @@ class LibrusUczenSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSzczesliwyNumerekSensor(CoordinatorEntity, SensorEntity):
+class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
     """Czujnik ze szczesliwym numerkiem dnia."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Szczesliwy numerek"
-        self._attr_unique_id = f"{config_entry.entry_id}_szczesliwy_numerek"
-        self._attr_icon = "mdi:numeric"
+    _availability_key = "student_info"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "lucky_number"
+        self._attr_unique_id = f"{config_entry.entry_id}_szczesliwy_numerek"
 
     @property
     def native_value(self) -> Any:
@@ -461,21 +151,16 @@ class LibrusSzczesliwyNumerekSensor(CoordinatorEntity, SensorEntity):
         return info.lucky_number if info else None
 
 
-class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
+class LibrusOcenySensor(LibrusEntity, SensorEntity):
     """Czujnik z wszystkimi ocenami pogrupowanymi wedlug przedmiotow."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Oceny"
-        self._attr_unique_id = f"{config_entry.entry_id}_oceny"
-        self._attr_icon = "mdi:school"
+    _availability_key = "grades"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "grades"
+        self._attr_unique_id = f"{config_entry.entry_id}_oceny"
 
     @property
     def native_value(self) -> int:
@@ -499,28 +184,24 @@ class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusPrzedmiotSensor(CoordinatorEntity, SensorEntity):
+class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
     """Czujnik z ocenami dla konkretnego przedmiotu."""
+
+    _availability_key = "grades"
 
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
         subject: str,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
     ) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
+        super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_has_entity_name = False
-        self._attr_name = subject
+        self._attr_translation_key = "subject_grades"
+        self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_przedmiot_{safe_name}"
-        self._attr_icon = "mdi:book-open-variant"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[str]:
@@ -560,23 +241,18 @@ class LibrusPrzedmiotSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
+class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia wszystkich ocen biezacego semestru (do wykresu)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    _availability_key = "grades"
+
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Srednia ocen"
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "average_grade"
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_ocen"
-        self._attr_icon = "mdi:chart-line"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[float]:
@@ -602,30 +278,26 @@ class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
+class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia ocen dla konkretnego przedmiotu (do wykresu)."""
+
+    _availability_key = "grades"
 
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
         subject: str,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
     ) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
+        super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_has_entity_name = False
-        self._attr_name = f"Srednia {subject}"
+        self._attr_translation_key = "subject_average"
+        self._attr_translation_placeholders = {"subject": subject}
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_{safe_name}"
-        self._attr_icon = "mdi:chart-bar"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[float]:
@@ -642,21 +314,16 @@ class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusTerminarzSensor(CoordinatorEntity, SensorEntity):
+class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zdarzeniami z kalendarza Librusa (biezacy + nastepny miesiac)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Terminarz"
-        self._attr_unique_id = f"{config_entry.entry_id}_terminarz"
-        self._attr_icon = "mdi:calendar-month"
+    _availability_key = "schedule"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "schedule"
+        self._attr_unique_id = f"{config_entry.entry_id}_terminarz"
 
     @property
     def native_value(self) -> int:
@@ -676,21 +343,16 @@ class LibrusTerminarzSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusZadaniaSensor(CoordinatorEntity, SensorEntity):
+class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zadaniami i sprawdzianami (30 dni do przodu)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Zadania"
-        self._attr_unique_id = f"{config_entry.entry_id}_zadania"
-        self._attr_icon = "mdi:calendar-check"
+    _availability_key = "homework"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "homework"
+        self._attr_unique_id = f"{config_entry.entry_id}_zadania"
 
     @property
     def native_value(self) -> int:
@@ -736,21 +398,16 @@ class _OdswiezanieCominutowe:
         return dt_util.now().replace(tzinfo=None)
 
 
-class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEntity):
+class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z planem lekcji (biezacy i nastepny tydzien)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Plan lekcji"
-        self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji"
-        self._attr_icon = "mdi:timetable"
+    _availability_key = "timetable"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "lesson_timetable"
+        self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji"
 
     def _plan(self) -> List[Dict]:
         return (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -809,21 +466,16 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEn
         }
 
 
-class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEntity):
+class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z trwajaca lub najblizsza lekcja."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Nastepna lekcja"
-        self._attr_unique_id = f"{config_entry.entry_id}_nastepna_lekcja"
-        self._attr_icon = "mdi:clock-start"
+    _availability_key = "timetable"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "next_lesson"
+        self._attr_unique_id = f"{config_entry.entry_id}_nastepna_lekcja"
 
     def _lekcja(self) -> Optional[Dict]:
         plan = (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -853,21 +505,16 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, CoordinatorEntity, Sens
         }
 
 
-class LibrusWiadomosciSensor(CoordinatorEntity, SensorEntity):
+class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
     """Czujnik z wiadomosciami (temat i nadawca, bez pobierania tresci)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
-        """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
-        self._attr_name = "Wiadomosci"
-        self._attr_unique_id = f"{config_entry.entry_id}_wiadomosci"
-        self._attr_icon = "mdi:message-text"
+    _availability_key = "messages"
 
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
+        """Inicjalizacja."""
+        super().__init__(coordinator, config_entry)
+        self._attr_translation_key = "messages"
+        self._attr_unique_id = f"{config_entry.entry_id}_wiadomosci"
 
     @property
     def native_value(self) -> int:

@@ -6,8 +6,9 @@ Integracja Home Assistant z systemem Librus Synergia, umożliwiająca monitorowa
 
 - 📊 **Monitoring ocen** - wszystkie oceny ze wszystkich przedmiotów
 - 📈 **Statystyki** - średnie ocen, liczba ocen, trend
-- 📧 **Wiadomości** - najnowsze wiadomości z dziennika
+- 📧 **Wiadomości** - nadawca, temat, data i status najnowszych wiadomości bez otwierania ich w Librusie
 - 🗓️ **Plan lekcji** - bieżący i następny tydzień, z zastępstwami i odwołanymi lekcjami
+- 📅 **Kalendarz planu lekcji** - natywna encja `calendar` Home Assistanta z lekcjami jako wydarzeniami
 - 🔔 **Powiadomienia** - automatyczne powiadomienia o nowych ocenach/wiadomościach
 - 🏠 **Dashboard** - piękne karty w Home Assistant
 
@@ -21,16 +22,29 @@ Integracja tworzy następujące sensory:
 | `sensor.librus_szczesliwy_numerek` | Szczęśliwy numerek dnia | numer |
 | `sensor.librus_oceny` | Wszystkie oceny bieżącego semestru | liczba ocen |
 | `sensor.librus_srednia_ocen` | **Globalna średnia** ze wszystkich przedmiotów | float (wykres 📈) |
-| `sensor.librus_wiadomosci` | Ostatnie 5 wiadomości z pełną treścią | liczba nieprzeczytanych |
+| `sensor.librus_wiadomosci` | Najnowsze wiadomości: nadawca, temat, data, status i informacja o załączniku | liczba nieprzeczytanych |
 | `sensor.librus_plan_lekcji` | Plan lekcji na bieżący i następny tydzień | liczba lekcji dzisiaj |
 | `sensor.librus_nastepna_lekcja` | Trwająca lub najbliższa lekcja (odświeżana co minutę) | nazwa przedmiotu |
 | `sensor.librus_<przedmiot>` | Oceny z danego przedmiotu (np. `sensor.librus_matematyka`) | lista ocen: "4, 3+, 5" |
 | `sensor.librus_srednia_<przedmiot>` | **Średnia** z danego przedmiotu (np. `sensor.librus_srednia_matematyka`) | float (wykres 📈) |
+| `calendar.librus_<uczen>_plan_lekcji` | Natywny kalendarz lekcji z godziną, przedmiotem, salą/nauczycielem i informacją o zmianach | bieżąca/najbliższa lekcja |
 
 Sensor `nastepna_lekcja` przelicza swój stan co minutę lokalnie — **bez dodatkowych zapytań do Librusa**
 (dane planu pobierane są razem z resztą, co 2 godziny).
 
 Sensory średnich mają `state_class: measurement` — HA automatycznie rysuje dla nich wykres historyczny po kliknięciu w encję.
+
+### Natywny kalendarz planu lekcji
+
+Encja `calendar.librus_<uczen>_plan_lekcji` korzysta z tego samego cache co sensory planu — **nie wykonuje dodatkowych zapytań do Librusa**. Home Assistant może pobierać z niej wydarzenia dla dowolnego zakresu znajdującego się w aktualnie pobranych dwóch tygodniach planu.
+
+- zwykła lekcja ma nazwę przedmiotu,
+- zastępstwo ma prefiks `[ZASTĘPSTWO]`,
+- odwołana lekcja pozostaje widoczna z prefiksem `[ODWOŁANA]`,
+- sala/nauczyciel trafia do lokalizacji wydarzenia,
+- odwołana lekcja nie jest wybierana jako bieżące/najbliższe wydarzenie kalendarza.
+
+To pozwala użyć standardowych kart kalendarza HA albo pobrać najbliższe dni do wyświetlenia np. na e-paper.
 
 ## 📦 Instalacja
 
@@ -73,20 +87,17 @@ Lub ręcznie:
 
 ### Częstotliwość odświeżania
 
-**Ustawienia → Urządzenia i usługi → Librus APIX → Konfiguruj**
-
-Domyślnie integracja odpytuje Librusa **co 2 godziny** (120 minut, zakres 15–1440).
-Zmiana działa od razu — Home Assistant przeładowuje integrację po zapisaniu opcji,
-restart nie jest potrzebny.
+Integracja odpytuje Librusa **co 2 godziny**. Interwał jest ustalony przez
+integrację zgodnie z zaleceniami Home Assistanta dla integracji pollingowych
+i nie jest konfigurowany w config flow ani opcjach integracji.
 
 Jedno odświeżenie to **8 zapytań HTTP**: oceny, wiadomości, zadania domowe, dane
-ucznia, terminarz (2 miesiące) i plan lekcji (2 tygodnie). Przy 120 minutach daje
-to około 96 zapytań na dobę. Warto o tym pamiętać, schodząc do 15 minut — będzie
-ich wtedy ponad 750.
+ucznia, terminarz (2 miesiące) i plan lekcji (2 tygodnie). Przy interwale
+2 godzin daje to około 96 zapytań na dobę.
 
 > Czujniki `Plan lekcji` i `Następna lekcja` przeliczają się **co minutę lokalnie**,
-> bez odpytywania Librusa. Dlatego odliczanie „za X minut" i przeskok na kolejny
-> dzień działają na bieżąco niezależnie od tego, jak rzadko pobierane są dane.
+> bez dodatkowych zapytań do Librusa. Dzięki temu odliczanie „za X minut" i
+> przeskok na kolejny dzień działają na bieżąco pomiędzy odświeżeniami danych.
 
 Po dodaniu integracji encje pojawią się w ciągu kilku sekund. Gotowy dashboard
 z planem lekcji wklejasz z pliku
@@ -600,9 +611,9 @@ automation:
 ## 🛠️ Rozwój
 
 ### Wymagania
-- Python 3.9+
-- Home Assistant 2023.1+
-- librus-apix library
+- Python 3.14.2+
+- Home Assistant 2026.9.3+
+- librus-apix 1.5.2
 
 ### Setup środowiska deweloperskiego
 ```bash
@@ -618,7 +629,7 @@ docker-compose up -d
 
 ### Uruchomienie testów
 ```bash
-pytest tests/
+python -m pytest -q
 ```
 
 ## 📝 Logi
@@ -633,10 +644,47 @@ logger:
 
 ## ⚠️ Bezpieczeństwo
 
-- **Nie udostępniaj swoich danych logowania!**  
-- Dane są przechowywane lokalnie w Home Assistant
-- Komunikacja z Librus odbywa się przez bezpieczne API
-- Hasła są zaszyfrowane w konfiguracji
+- **Nie udostępniaj swoich danych logowania.**
+- Dane logowania są przechowywane w config entry Home Assistanta; chroń katalog
+  konfiguracji oraz kopie zapasowe.
+- Diagnostyka integracji usuwa login i hasło przed wygenerowaniem pliku.
+- Połączenia z Librus Synergia są wykonywane przez HTTPS.
+
+## 🔎 Diagnostyka
+
+W **Ustawienia → Urządzenia i usługi → Librus Synergia HA** można pobrać
+diagnostykę wpisu integracji. Plik zawiera status coordinatora, dostępność
+poszczególnych źródeł i liczniki danych, ale nie zawiera loginu, hasła,
+nazwiska ucznia ani treści wiadomości.
+
+## ⚠️ Znane ograniczenia
+
+- Librus jest usługą chmurową bez mechanizmu push, dlatego dane są pobierane
+  cyklicznie co 2 godziny.
+- Plan lekcji obejmuje bieżący i następny tydzień udostępniony przez Librusa.
+- Terminarz obejmuje bieżący i następny miesiąc.
+- Integracja celowo nie pobiera pełnej treści wiadomości, aby ich odczyt nie
+  oznaczał wiadomości jako przeczytanych.
+- Biblioteka `librus-apix` jest synchroniczna, więc wywołania HTTP są
+  wykonywane poza pętlą asyncio Home Assistanta.
+
+## 🧰 Rozwiązywanie problemów
+
+1. Jeśli encje są `unavailable`, sprawdź najpierw, czy strona Librus Synergia
+   działa i czy nie trwa przerwa techniczna.
+2. Jeśli dane logowania zostaną odrzucone, Home Assistant uruchomi reautoryzację
+   i poprosi o aktualne hasło.
+3. Pobierz diagnostykę integracji i sprawdź pole `data_sources_available`.
+4. W razie potrzeby włącz logowanie debug opisane poniżej i dołącz logi do issue,
+   po usunięciu danych osobowych.
+
+## 🗑️ Usuwanie integracji
+
+1. Otwórz **Ustawienia → Urządzenia i usługi → Librus Synergia HA**.
+2. Otwórz menu wpisu integracji i wybierz **Usuń**.
+3. Jeśli integracja została zainstalowana przez HACS i nie będzie już używana,
+   można ją następnie odinstalować również z HACS.
+4. Po usunięciu wpisu dane logowania nie są już używane przez integrację.
 
 ## 🐛 Zgłaszanie błędów
 
@@ -662,8 +710,7 @@ została zachowana w pliku `LICENSE`; nota dotycząca zmian w forku jest dopisan
 obok, a nie zamiast niej.
 
 Fork dodaje: plan lekcji, oznaczanie wydarzeń z terminarza i prac domowych
-na kartach, kartę nadchodzących wydarzeń oraz konfigurację częstotliwości
-odświeżania w UI.
+na kartach, kartę nadchodzących wydarzeń oraz natywny kalendarz planu lekcji.
 
 ### Komponenty zewnętrzne
 

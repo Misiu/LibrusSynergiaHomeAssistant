@@ -2,6 +2,8 @@ name: Validate
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   schedule:
     - cron: "0 0 * * *"
@@ -19,3 +21,7 @@ jobs:
         uses: "hacs/action@main"
         with:
           category: "integration"
+          # GitHub license detection can return SPDX: NOASSERTION for forks/PR refs
+          # even when LICENSE contains the standard MIT text. License is verified
+          # in the repository itself; skip only this metadata-based HACS check.
+          ignore: "license"
