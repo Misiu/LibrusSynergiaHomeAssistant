@@ -19,7 +19,7 @@ from custom_components.librus_apix.coordinator import (
 )
 
 
-def _entry():
+def _entry() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Test Librus",
@@ -27,7 +27,7 @@ def _entry():
     )
 
 
-def _client():
+def _client() -> MagicMock:
     client = MagicMock()
     client.async_get_student_information = AsyncMock(
         return_value=SimpleNamespace(name="Jan Kowalski")
@@ -203,3 +203,35 @@ async def test_pelna_awaria_z_cache_nadal_jest_update_failed(hass: HomeAssistant
 
     with pytest.raises(UpdateFailed, match="Librus API is unavailable"):
         await coordinator._async_update_data()
+
+
+
+async def test_partial_source_availability_logs_only_transitions(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Partial source failures log once and recovery logs once."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    client.async_get_messages.return_value = None
+    await coordinator._async_update_data()
+    await coordinator._async_update_data()
+
+    unavailable_logs = [
+        record.message
+        for record in caplog.records
+        if record.message == "Librus data source messages is unavailable"
+    ]
+    assert len(unavailable_logs) == 1
+
+    client.async_get_messages.return_value = []
+    await coordinator._async_update_data()
+    await coordinator._async_update_data()
+
+    recovery_logs = [
+        record.message
+        for record in caplog.records
+        if record.message == "Librus data source messages is available again"
+    ]
+    assert len(recovery_logs) == 1
