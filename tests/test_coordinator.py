@@ -69,12 +69,7 @@ async def test_pusty_cache_ocen_jest_poprawnym_cache(hass):
     """Uczen bez ocen nie traci dostepnosci przy chwilowym bledzie ocen."""
     entry = _entry()
     client = _client()
-    client.async_get_student_information.return_value = None
     client.async_get_grades.return_value = None
-    client.async_get_messages.return_value = None
-    client.async_get_homework.return_value = None
-    client.async_get_schedule.return_value = None
-    client.async_get_timetable.return_value = None
 
     coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
     student = SimpleNamespace(name="Jan Kowalski")
