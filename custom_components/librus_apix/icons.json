@@ -1,0 +1,44 @@
+{
+  "entity": {
+    "sensor": {
+      "student_information": {
+        "default": "mdi:account-school"
+      },
+      "lucky_number": {
+        "default": "mdi:numeric"
+      },
+      "grades": {
+        "default": "mdi:school"
+      },
+      "subject_grades": {
+        "default": "mdi:book-open-variant"
+      },
+      "average_grade": {
+        "default": "mdi:chart-line"
+      },
+      "subject_average": {
+        "default": "mdi:chart-bar"
+      },
+      "schedule": {
+        "default": "mdi:calendar-month"
+      },
+      "homework": {
+        "default": "mdi:calendar-check"
+      },
+      "lesson_timetable": {
+        "default": "mdi:timetable"
+      },
+      "next_lesson": {
+        "default": "mdi:clock-start"
+      },
+      "messages": {
+        "default": "mdi:message-text"
+      }
+    },
+    "calendar": {
+      "lesson_timetable": {
+        "default": "mdi:calendar-school"
+      }
+    }
+  }
+}
