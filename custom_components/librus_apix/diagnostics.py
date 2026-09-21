@@ -35,5 +35,6 @@ async def async_get_config_entry_diagnostics(
             "schedule_count": len(data["terminarz"]),
             "lesson_count": len(data["plan_lekcji"]),
             "current_semester": data["semestr_biezacy"],
+            "data_sources_available": data.get("availability", {}),
         },
     }
