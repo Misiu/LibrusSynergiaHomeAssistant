@@ -107,6 +107,8 @@ def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
 class LibrusUczenSensor(LibrusEntity, SensorEntity):
     """Czujnik z informacjami o uczniu."""
 
+    _availability_key = "student_info"
+
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
@@ -136,6 +138,8 @@ class LibrusUczenSensor(LibrusEntity, SensorEntity):
 class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
     """Czujnik ze szczesliwym numerkiem dnia."""
 
+    _availability_key = "student_info"
+
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
@@ -151,6 +155,8 @@ class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
 
 class LibrusOcenySensor(LibrusEntity, SensorEntity):
     """Czujnik z wszystkimi ocenami pogrupowanymi wedlug przedmiotow."""
+
+    _availability_key = "grades"
 
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
@@ -183,6 +189,8 @@ class LibrusOcenySensor(LibrusEntity, SensorEntity):
 
 class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
     """Czujnik z ocenami dla konkretnego przedmiotu."""
+
+    _availability_key = "grades"
 
     def __init__(
         self,
@@ -240,6 +248,8 @@ class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
 class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia wszystkich ocen biezacego semestru (do wykresu)."""
 
+    _availability_key = "grades"
+
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
@@ -276,6 +286,8 @@ class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
 class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia ocen dla konkretnego przedmiotu (do wykresu)."""
 
+    _availability_key = "grades"
+
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
@@ -311,6 +323,8 @@ class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
 class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zdarzeniami z kalendarza Librusa (biezacy + nastepny miesiac)."""
 
+    _availability_key = "schedule"
+
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
@@ -338,6 +352,8 @@ class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
 
 class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zadaniami i sprawdzianami (30 dni do przodu)."""
+
+    _availability_key = "homework"
 
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
@@ -392,6 +408,8 @@ class _OdswiezanieCominutowe:
 
 class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z planem lekcji (biezacy i nastepny tydzien)."""
+
+    _availability_key = "timetable"
 
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
@@ -460,6 +478,8 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity)
 class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z trwajaca lub najblizsza lekcja."""
 
+    _availability_key = "timetable"
+
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
         super().__init__(coordinator, config_entry)
@@ -497,6 +517,8 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEnt
 
 class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
     """Czujnik z wiadomosciami (temat i nadawca, bez pobierania tresci)."""
+
+    _availability_key = "messages"
 
     def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
