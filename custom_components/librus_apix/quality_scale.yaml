@@ -17,7 +17,7 @@ rules:
     comment: The integration does not provide conditions.
   docs-high-level-description: done
   docs-installation-instructions: done
-  docs-removal-instructions: todo
+  docs-removal-instructions: done
   docs-triggers:
     status: exempt
     comment: The integration does not provide device or entity triggers.
@@ -56,14 +56,14 @@ rules:
   discovery-update-info:
     status: exempt
     comment: The integration does not use discovery.
-  docs-data-update: todo
+  docs-data-update: done
   docs-examples: done
-  docs-known-limitations: todo
+  docs-known-limitations: done
   docs-supported-devices:
     status: exempt
     comment: This is a cloud service integration rather than a device integration.
   docs-supported-functions: done
-  docs-troubleshooting: todo
+  docs-troubleshooting: done
   docs-use-cases: done
   dynamic-devices:
     status: exempt
