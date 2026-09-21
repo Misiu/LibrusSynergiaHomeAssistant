@@ -82,6 +82,8 @@ async def async_setup_entry(
 class LibrusPlanLekcjiCalendar(LibrusEntity, CalendarEntity):
     """Kalendarz planu lekcji z danych pobranych przez wspolny coordinator."""
 
+    _availability_key = "timetable"
+
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
