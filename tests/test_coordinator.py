@@ -14,9 +14,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.librus_apix.const import DOMAIN
 from custom_components.librus_apix.coordinator import (
+    EVENT_NOWA_OCENA,
     EVENT_NOWA_WIADOMOSC,
+    EVENT_NOWE_ZADANIE,
+    EVENT_NOWE_ZDARZENIE,
+    EVENT_ZMIANA_PLANU,
     LibrusDataUpdateCoordinator,
     _current_semester,
+    _jest_nowa,
 )
 
 
@@ -287,3 +292,115 @@ async def test_first_recovery_of_source_does_not_emit_old_events(
 
     assert len(events) == 1
     assert events[0].data["temat"] == "New message"
+
+
+
+def test_jest_nowa_handles_empty_and_invalid_dates() -> None:
+    """Invalid or empty date strings are not treated as new."""
+    assert _jest_nowa("") is False
+    assert _jest_nowa("not-a-date") is False
+
+
+async def test_unexpected_client_error_is_wrapped(hass: HomeAssistant) -> None:
+    """Unexpected library errors become coordinator UpdateFailed."""
+    entry = _entry()
+    client = _client()
+    client.async_get_student_information.side_effect = RuntimeError("boom")
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    with pytest.raises(UpdateFailed, match="Blad komunikacji z API: boom"):
+        await coordinator._async_update_data()
+
+
+async def test_new_items_fire_all_supported_events(hass: HomeAssistant) -> None:
+    """After seeding, new items from each source emit their HA events."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    await coordinator._async_update_data()
+
+    received: dict[str, list] = {
+        EVENT_NOWA_WIADOMOSC: [],
+        EVENT_NOWA_OCENA: [],
+        EVENT_NOWE_ZADANIE: [],
+        EVENT_NOWE_ZDARZENIE: [],
+        EVENT_ZMIANA_PLANU: [],
+    }
+    for event_type in received:
+        hass.bus.async_listen(
+            event_type,
+            lambda event, event_type=event_type: received[event_type].append(event),
+        )
+
+    client.async_get_messages.return_value = [
+        {
+            "author": "Sekretariat",
+            "title": "Nowa wiadomosc",
+            "date": "2026-09-21",
+            "href": "/message/new",
+            "unread": True,
+            "has_attachment": False,
+        }
+    ]
+    client.async_get_grades.return_value = [
+        {
+            "subject": "Matematyka",
+            "grade": "5",
+            "date": "2026-09-21",
+            "category": "Test",
+            "teacher": "Anna Nowak",
+            "semester": 1,
+            "type": "numeric",
+        }
+    ]
+    client.async_get_homework.return_value = [
+        SimpleNamespace(
+            subject="Matematyka",
+            category="Praca domowa",
+            teacher="Anna Nowak",
+            lesson="",
+            task_date="2026-09-21",
+            completion_date="2026-09-22",
+            href="/homework/new",
+        )
+    ]
+    client.async_get_schedule.return_value = [
+        {
+            "data": "2026-09-22",
+            "tytul": "Sprawdzian",
+            "przedmiot": "Matematyka",
+            "godzina": "08:00",
+            "numer_lekcji": 1,
+            "szczegoly": {},
+            "href": "/schedule/new",
+        }
+    ]
+    client.async_get_timetable.return_value = [
+        {
+            "data": "2026-09-22",
+            "dzien_tygodnia": "Wtorek",
+            "numer": 1,
+            "przedmiot": "Matematyka",
+            "nauczyciel_sala": "Anna Nowak, 12",
+            "od": "08:00",
+            "do": "08:45",
+            "przerwa_od": "",
+            "przerwa_do": "",
+            "odwolana": False,
+            "zastepstwo": True,
+            "info": "Zastepstwo",
+            "szczegoly": {},
+        }
+    ]
+
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+
+    assert {event_type: len(events) for event_type, events in received.items()} == {
+        EVENT_NOWA_WIADOMOSC: 1,
+        EVENT_NOWA_OCENA: 1,
+        EVENT_NOWE_ZADANIE: 1,
+        EVENT_NOWE_ZDARZENIE: 1,
+        EVENT_ZMIANA_PLANU: 1,
+    }
