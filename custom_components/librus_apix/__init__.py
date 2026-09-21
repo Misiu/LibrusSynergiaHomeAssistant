@@ -17,6 +17,7 @@ from librus_apix.client import Client, new_client
 from librus_apix.exceptions import TokenError
 
 from .const import DOMAIN, SCAN_INTERVAL
+from .coordinator import LibrusDataUpdateCoordinator, _interwal_odswiezania
 from .plan_lekcji import DNI_TYGODNIA_PL, przetworz_plan
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def _current_semester() -> int:
     m = date.today().month
     return 1 if m >= 9 else 2
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "calendar"]
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -413,10 +414,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to authenticate")
         return False
     
+    coordinator = LibrusDataUpdateCoordinator(
+        hass, client, _interwal_odswiezania(entry)
+    )
+    await coordinator.async_config_entry_first_refresh()
+
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = client
-    
-    # Setup platforms
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    # Sensor i calendar korzystaja z tej samej instancji koordynatora.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
     return True
