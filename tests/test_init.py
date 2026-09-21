@@ -116,20 +116,29 @@ async def _setup(hass: HomeAssistant, entry, client) -> None:
 
 
 async def test_setup_entry(hass: HomeAssistant, mock_config_entry, mock_librus_client):
-    """Test the setup entry."""
+    """Coordinator jest przechowywany w runtime_data wpisu config entry."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    assert mock_config_entry.entry_id in hass.data[DOMAIN]
+    coordinator = mock_config_entry.runtime_data
+    assert coordinator.client is mock_librus_client
+    assert coordinator.config_entry is mock_config_entry
+    assert coordinator.data["student_info"].name == "Jan Kowalski"
 
 
 async def test_unload_entry(hass: HomeAssistant, mock_config_entry, mock_librus_client):
-    """Test unloading an entry."""
+    """Unload usuwa encje obu platform i zatrzymuje coordinator."""
     await _setup(hass, mock_config_entry, mock_librus_client)
+
+    sensor_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
+    calendar_id = _entity_id(
+        hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
+    )
 
     assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert mock_config_entry.entry_id not in hass.data[DOMAIN]
+    assert hass.states.get(sensor_id) is None
+    assert hass.states.get(calendar_id) is None
 
 
 async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_librus_client):
@@ -379,3 +388,62 @@ async def test_sensor_i_calendar_uzywaja_tego_samego_koordynatora(
 
     assert sensor_entity.coordinator is calendar_entity.coordinator
     assert mock_librus_client.async_get_timetable.await_count == 1
+
+
+
+async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Nowy przedmiot po pierwszym setupie dostaje sensor i sensor sredniej."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    registry = er.async_get(hass)
+    chemia_unique = f"{mock_config_entry.entry_id}_przedmiot_chemia"
+    srednia_unique = f"{mock_config_entry.entry_id}_srednia_chemia"
+    assert registry.async_get_entity_id("sensor", DOMAIN, chemia_unique) is None
+
+    mock_librus_client.async_get_grades.return_value = [
+        {
+            "subject": "Matematyka",
+            "grade": "5",
+            "date": "2026-09-01",
+            "category": "Test",
+            "teacher": "Jan Kowalski",
+            "semester": 1,
+            "type": "numeric",
+        },
+        {
+            "subject": "Chemia",
+            "grade": "4",
+            "date": "2026-09-20",
+            "category": "Kartkowka",
+            "teacher": "Anna Nowak",
+            "semester": 1,
+            "type": "numeric",
+        },
+    ]
+
+    await mock_config_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    chemia_id = registry.async_get_entity_id("sensor", DOMAIN, chemia_unique)
+    srednia_id = registry.async_get_entity_id("sensor", DOMAIN, srednia_unique)
+    assert chemia_id is not None
+    assert srednia_id is not None
+    assert hass.states[chemia_id].state == "4"
+    assert hass.states[srednia_id].state == "4.0"
+
+
+async def test_wszystkie_encje_maja_to_samo_urzadzenie(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Sensory i kalendarz sa przypiete do jednego urzadzenia Librus."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    registry = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(registry, mock_config_entry.entry_id)
+    assert len(entries) >= 12
+
+    device_ids = {entry.device_id for entry in entries}
+    assert None not in device_ids
+    assert len(device_ids) == 1
