@@ -13,8 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpda
 
 from .const import DEFAULT_PLAN_DAYS, DOMAIN
 from .coordinator import LibrusDataUpdateCoordinator
-PARALLEL_UPDATES = 0
-
 from .plan_lekcji import (
     biezacy_dzien,
     dni_do_wyswietlenia,
@@ -22,6 +20,8 @@ from .plan_lekcji import (
     nastepna_lekcja,
     polacz_z_wydarzeniami,
 )
+
+PARALLEL_UPDATES = 0
 
 
 
@@ -60,17 +60,40 @@ async def async_setup_entry(
         LibrusTerminarzSensor(coordinator, config_entry),
         LibrusPlanLekcjiSensor(coordinator, config_entry),
         LibrusNastepnaLekcjaSensor(coordinator, config_entry),
+        LibrusSredniaOcenSensor(coordinator, config_entry),
     ]
-
-    # Tworz czujniki per przedmiot na podstawie pierwszego pobrania danych
-    for subject in coordinator.data.get("oceny_wg_przedmiotu", {}).keys():
-        entities.append(LibrusPrzedmiotSensor(coordinator, subject, config_entry))
-        entities.append(LibrusSredniaPrzedmiotuSensor(coordinator, subject, config_entry))
-
-    # Czujnik globalnej sredniej
-    entities.append(LibrusSredniaOcenSensor(coordinator, config_entry))
-
     async_add_entities(entities)
+
+    known_subjects: set[str] = set()
+
+    @callback
+    def _add_subject_entities() -> None:
+        """Dodaj encje dla przedmiotow, ktore pojawily sie po setupie."""
+        subjects = set(
+            (coordinator.data or {}).get("oceny_wg_przedmiotu", {})
+        )
+        new_subjects = sorted(subjects - known_subjects)
+        if not new_subjects:
+            return
+
+        subject_entities: List[SensorEntity] = []
+        for subject in new_subjects:
+            subject_entities.extend(
+                [
+                    LibrusPrzedmiotSensor(coordinator, subject, config_entry),
+                    LibrusSredniaPrzedmiotuSensor(
+                        coordinator, subject, config_entry
+                    ),
+                ]
+            )
+
+        known_subjects.update(new_subjects)
+        async_add_entities(subject_entities)
+
+    _add_subject_entities()
+    config_entry.async_on_unload(
+        coordinator.async_add_listener(_add_subject_entities)
+    )
 
 
 def _device_info(coordinator: DataUpdateCoordinator, config_entry: ConfigEntry) -> Dict[str, Any]:
