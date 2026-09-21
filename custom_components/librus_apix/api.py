@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import traceback
 
 from homeassistant.util import dt as dt_util
 from librus_apix.client import Client, new_client
@@ -17,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 class LibrusApiClient:
     """Class to interface with the Librus API."""
 
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str) -> None:
         """Initialize the client."""
         self.username = username
         self.password = password
@@ -31,7 +30,7 @@ class LibrusApiClient:
         self._client = None
         self._token = None
 
-    async def async_authenticate(self):
+    async def async_authenticate(self) -> bool:
         """Authenticate with Librus API."""
         async with self._auth_lock:
             try:
@@ -55,7 +54,7 @@ class LibrusApiClient:
                 return False
             except Exception as ex:
                 self.last_auth_error = ex
-                _LOGGER.error("Authentication failed: %s\n%s", ex, traceback.format_exc())
+                _LOGGER.debug("Authentication failed: %s", ex, exc_info=True)
                 self._reset_auth()
                 return False
 
@@ -126,12 +125,13 @@ class LibrusApiClient:
                 )
                 self._reset_auth()
                 if attempt == 1:
-                    _LOGGER.error("Failed to get grades after re-authentication.")
                     return None
             except Exception as ex:
-                _LOGGER.error(
-                    "Failed to get grades (attempt %d/2): %s\n%s",
-                    attempt + 1, ex, traceback.format_exc(),
+                _LOGGER.debug(
+                    "Failed to get grades (attempt %d/2): %s",
+                    attempt + 1,
+                    ex,
+                    exc_info=True,
                 )
                 self._reset_auth()
                 if attempt == 1:
@@ -173,12 +173,13 @@ class LibrusApiClient:
                 )
                 self._reset_auth()
                 if attempt == 1:
-                    _LOGGER.error("Failed to get messages after re-authentication.")
                     return None
             except Exception as ex:
-                _LOGGER.error(
-                    "Failed to get messages (attempt %d/2): %s\n%s",
-                    attempt + 1, ex, traceback.format_exc(),
+                _LOGGER.debug(
+                    "Failed to get messages (attempt %d/2): %s",
+                    attempt + 1,
+                    ex,
+                    exc_info=True,
                 )
                 self._reset_auth()
                 if attempt == 1:
@@ -193,7 +194,7 @@ class LibrusApiClient:
                         return None
 
                 from librus_apix.homework import get_homework
-                from datetime import date as _date, timedelta
+                from datetime import timedelta
 
                 today = dt_util.now().date()
                 date_from = today.strftime("%Y-%m-%d")
@@ -211,12 +212,13 @@ class LibrusApiClient:
                 )
                 self._reset_auth()
                 if attempt == 1:
-                    _LOGGER.error("Failed to get homework after re-authentication.")
                     return None
             except Exception as ex:
-                _LOGGER.error(
-                    "Failed to get homework (attempt %d/2): %s\n%s",
-                    attempt + 1, ex, traceback.format_exc(),
+                _LOGGER.debug(
+                    "Failed to get homework (attempt %d/2): %s",
+                    attempt + 1,
+                    ex,
+                    exc_info=True,
                 )
                 self._reset_auth()
                 if attempt == 1:
@@ -274,12 +276,13 @@ class LibrusApiClient:
                 )
                 self._reset_auth()
                 if attempt == 1:
-                    _LOGGER.error("Failed to get schedule after re-authentication.")
                     return None
             except Exception as ex:
-                _LOGGER.error(
-                    "Failed to get schedule (attempt %d/2): %s\n%s",
-                    attempt + 1, ex, traceback.format_exc(),
+                _LOGGER.debug(
+                    "Failed to get schedule (attempt %d/2): %s",
+                    attempt + 1,
+                    ex,
+                    exc_info=True,
                 )
                 self._reset_auth()
                 if attempt == 1:
@@ -329,12 +332,13 @@ class LibrusApiClient:
                 )
                 self._reset_auth()
                 if attempt == 1:
-                    _LOGGER.error("Failed to get timetable after re-authentication.")
                     return None
             except Exception as ex:
-                _LOGGER.error(
-                    "Failed to get timetable (attempt %d/2): %s\n%s",
-                    attempt + 1, ex, traceback.format_exc(),
+                _LOGGER.debug(
+                    "Failed to get timetable (attempt %d/2): %s",
+                    attempt + 1,
+                    ex,
+                    exc_info=True,
                 )
                 self._reset_auth()
                 if attempt == 1:
@@ -353,8 +357,8 @@ class LibrusApiClient:
             return await loop.run_in_executor(None, get_student_information, self._client)
 
         except Exception as ex:
-            _LOGGER.error(
-                "Failed to get student information: %s\n%s", ex, traceback.format_exc()
+            _LOGGER.debug(
+                "Failed to get student information: %s", ex, exc_info=True
             )
             self._reset_auth()
             return None
