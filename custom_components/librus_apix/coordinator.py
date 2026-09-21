@@ -1,7 +1,7 @@
 """Wspolny koordynator danych dla integracji Librus APIX."""
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, TypedDict
 
 from homeassistant.config_entries import ConfigEntry
@@ -212,7 +212,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
 
             return result
 
-        except UpdateFailed:
+        except (ConfigEntryAuthFailed, UpdateFailed):
             raise
         except Exception as err:
             raise UpdateFailed(f"Blad komunikacji z API: {err}") from err
