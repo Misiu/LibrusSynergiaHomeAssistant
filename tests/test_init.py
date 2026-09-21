@@ -608,3 +608,28 @@ async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
     await hass.async_block_till_done()
 
     assert hass.states.get(lucky_id).state == "21"
+
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (1, 15),
+        (14, 15),
+        (15, 15),
+        (1440, 1440),
+        (5000, 1440),
+    ],
+)
+async def test_interwal_jest_ograniczony_do_zakresu_opcji(
+    hass: HomeAssistant, mock_config_entry, value, expected
+):
+    """Coordinator respektuje backendowo ten sam zakres co formularz opcji."""
+    from custom_components.librus_apix.coordinator import _interwal_odswiezania
+
+    mock_config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        mock_config_entry, options={"scan_interval_minutes": value}
+    )
+
+    assert _interwal_odswiezania(mock_config_entry) == timedelta(minutes=expected)
