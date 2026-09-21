@@ -98,16 +98,22 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
 
         try:
             student_info = await self.client.async_get_student_information()
-            grades = await self.client.async_get_grades()
-            messages = await self.client.async_get_messages(count=10)
-            homework_raw = await self.client.async_get_homework()
-            schedule_raw = await self.client.async_get_schedule()
-            plan_raw = await self.client.async_get_timetable()
+            self._raise_if_auth_failed()
 
-            if isinstance(
-                getattr(self.client, "last_auth_error", None), AuthorizationError
-            ):
-                raise ConfigEntryAuthFailed("Librus rejected the credentials")
+            grades = await self.client.async_get_grades()
+            self._raise_if_auth_failed()
+
+            messages = await self.client.async_get_messages(count=10)
+            self._raise_if_auth_failed()
+
+            homework_raw = await self.client.async_get_homework()
+            self._raise_if_auth_failed()
+
+            schedule_raw = await self.client.async_get_schedule()
+            self._raise_if_auth_failed()
+
+            plan_raw = await self.client.async_get_timetable()
+            self._raise_if_auth_failed()
 
             prev = self.data or {}
 
@@ -194,6 +200,13 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
             raise
         except Exception as err:
             raise UpdateFailed(f"Blad komunikacji z API: {err}") from err
+
+    def _raise_if_auth_failed(self) -> None:
+        """Przerwij cykl natychmiast po odrzuceniu danych logowania."""
+        if isinstance(
+            getattr(self.client, "last_auth_error", None), AuthorizationError
+        ):
+            raise ConfigEntryAuthFailed("Librus rejected the credentials")
 
     def _fire_events(self, messages: List[Dict], grades: List[Dict]) -> None:
         """Wyslij zdarzenia HA dla nowych wiadomosci i ocen."""
