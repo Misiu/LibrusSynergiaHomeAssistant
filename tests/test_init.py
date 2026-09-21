@@ -5,10 +5,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from librus_apix.exceptions import AuthorizationError, MaintananceError
 
 from custom_components.librus_apix.const import DOMAIN
 
@@ -447,3 +450,44 @@ async def test_wszystkie_encje_maja_to_samo_urzadzenie(
     device_ids = {entry.device_id for entry in entries}
     assert None not in device_ids
     assert len(device_ids) == 1
+
+
+
+async def test_setup_bad_credentials_triggers_reauth(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Odrzucone dane logowania powinny uruchomic reauth w HA."""
+    mock_config_entry.add_to_hass(hass)
+    mock_librus_client.async_authenticate.return_value = False
+    mock_librus_client.last_auth_error = AuthorizationError("bad credentials")
+
+    with patch(
+        "custom_components.librus_apix.LibrusApiClient",
+        return_value=mock_librus_client,
+    ):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert mock_config_entry.state.name == "SETUP_ERROR"
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert any(flow["context"]["source"] == config_entries.SOURCE_REAUTH for flow in flows)
+
+
+async def test_setup_maintenance_is_retryable(
+    hass: HomeAssistant, mock_config_entry, mock_librus_client
+):
+    """Maintenance Librusa nie powinien byc traktowany jako zle haslo."""
+    mock_config_entry.add_to_hass(hass)
+    mock_librus_client.async_authenticate.return_value = False
+    mock_librus_client.last_auth_error = MaintananceError("maintenance")
+
+    with patch(
+        "custom_components.librus_apix.LibrusApiClient",
+        return_value=mock_librus_client,
+    ):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert mock_config_entry.state.name == "SETUP_RETRY"
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert not any(flow["context"]["source"] == config_entries.SOURCE_REAUTH for flow in flows)
