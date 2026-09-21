@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: requirements_test.txt
       - name: Install test dependencies
         run: pip install -r requirements_test.txt
+      - name: Ruff check
+        run: ruff check custom_components/librus_apix tests
       - name: Compile integration
         run: python -m compileall -q custom_components/librus_apix tests
       - name: Run tests
