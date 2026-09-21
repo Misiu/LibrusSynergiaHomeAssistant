@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.librus_apix.const import DOMAIN
 from custom_components.librus_apix.coordinator import (
+    EVENT_NOWA_WIADOMOSC,
     LibrusDataUpdateCoordinator,
     _current_semester,
 )
@@ -58,15 +59,20 @@ def test_current_semester(
     assert _current_semester() == expected
 
 
-async def test_pierwszy_blad_ocen_bez_cache_powoduje_update_failed(hass: HomeAssistant) -> None:
-    """Pierwsze pobranie nie moze udawac sukcesu bez danych o ocenach."""
+async def test_pierwszy_blad_ocen_nie_blokuje_innych_zrodel(
+    hass: HomeAssistant,
+) -> None:
+    """A single unavailable source does not block the whole integration."""
     entry = _entry()
     client = _client()
     client.async_get_grades.return_value = None
     coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
 
-    with pytest.raises(UpdateFailed):
-        await coordinator._async_update_data()
+    result = await coordinator._async_update_data()
+
+    assert result["availability"]["grades"] is False
+    assert result["oceny"] == []
+    assert result["student_info"].name == "Jan Kowalski"
 
 
 async def test_pusty_cache_ocen_jest_poprawnym_cache(hass: HomeAssistant) -> None:
@@ -235,3 +241,49 @@ async def test_partial_source_availability_logs_only_transitions(
         if record.message == "Librus data source messages is available again"
     ]
     assert len(recovery_logs) == 1
+
+
+
+async def test_first_recovery_of_source_does_not_emit_old_events(
+    hass: HomeAssistant,
+) -> None:
+    """The first successful fetch of a recovered source only seeds its cache."""
+    entry = _entry()
+    client = _client()
+    client.async_get_messages.return_value = None
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+    events = []
+    hass.bus.async_listen(EVENT_NOWA_WIADOMOSC, events.append)
+
+    await coordinator._async_update_data()
+
+    client.async_get_messages.return_value = [
+        {
+            "author": "Sekretariat",
+            "title": "Existing message",
+            "date": "2026-09-20",
+            "href": "/message/1",
+            "unread": True,
+            "has_attachment": False,
+        }
+    ]
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+
+    assert events == []
+
+    client.async_get_messages.return_value.append(
+        {
+            "author": "Sekretariat",
+            "title": "New message",
+            "date": "2026-09-21",
+            "href": "/message/2",
+            "unread": True,
+            "has_attachment": False,
+        }
+    )
+    await coordinator._async_update_data()
+    await hass.async_block_till_done()
+
+    assert len(events) == 1
+    assert events[0].data["temat"] == "New message"
