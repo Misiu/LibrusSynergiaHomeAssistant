@@ -12,7 +12,6 @@ from homeassistant.core import HomeAssistant
 
 from librus_apix import client as librus_client
 from librus_apix.exceptions import AuthorizationError, MaintananceError
-from librus_apix.exceptions import AuthorizationError, MaintananceError
 
 from .const import DOMAIN
 
@@ -24,14 +23,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): str,
     }
 )
-
-
-class CannotConnect(Exception):
-    """Error to indicate we cannot connect to Librus."""
-
-
-class InvalidAuth(Exception):
-    """Error to indicate Librus rejected the credentials."""
 
 
 class CannotConnect(Exception):
@@ -71,10 +62,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(
-        self, user_input: dict | None = None
+        self, user_input: dict[str, str] | None = None
     ) -> ConfigFlowResult:
         """Handle the initial step."""
-        errors = {}
+        errors: dict[str, str] = {}
         
         if user_input is not None:
             self._async_abort_entries_match(
@@ -105,10 +96,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
-        self, user_input: dict | None = None
+        self, user_input: dict[str, str] | None = None
     ) -> ConfigFlowResult:
         """Popros o nowe haslo i przeladuj wpis po poprawnym logowaniu."""
-        errors = {}
+        errors: dict[str, str] = {}
         reauth_entry = self._get_reauth_entry()
         username = reauth_entry.data[CONF_USERNAME]
 
