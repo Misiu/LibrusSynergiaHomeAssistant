@@ -88,7 +88,7 @@ class LibrusPlanLekcjiCalendar(LibrusEntity, CalendarEntity):
         config_entry: LibrusConfigEntry,
     ) -> None:
         super().__init__(coordinator, config_entry)
-        self._attr_name = "Plan lekcji"
+        self._attr_translation_key = "lesson_timetable"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji_calendar"
         self._attr_icon = "mdi:calendar-school"
 
