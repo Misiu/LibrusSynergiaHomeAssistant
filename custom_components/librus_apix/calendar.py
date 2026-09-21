@@ -4,31 +4,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.calendar import CalendarEntity, CalendarEvent
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .coordinator import LibrusDataUpdateCoordinator
+from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
+from .entity import LibrusEntity
 
 PARALLEL_UPDATES = 0
-
-
-def _device_info(
-    coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry
-) -> Dict[str, Any]:
-    """Zwroc informacje o urzadzeniu."""
-    data = coordinator.data or {}
-    student_info = data.get("student_info")
-    name = student_info.name if student_info else "Librus"
-    return {
-        "identifiers": {(DOMAIN, config_entry.entry_id)},
-        "name": f"Librus - {name}",
-        "manufacturer": "Librus",
-        "model": "Synergia",
-    }
 
 
 def _parse_local_datetime(date_str: str, time_str: str) -> Optional[datetime]:
@@ -88,7 +71,7 @@ def _lesson_to_event(lesson: Dict[str, Any]) -> Optional[CalendarEvent]:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: LibrusConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Skonfiguruj kalendarz planu lekcji."""
@@ -96,26 +79,18 @@ async def async_setup_entry(
     async_add_entities([LibrusPlanLekcjiCalendar(coordinator, config_entry)])
 
 
-class LibrusPlanLekcjiCalendar(
-    CoordinatorEntity[LibrusDataUpdateCoordinator], CalendarEntity
-):
+class LibrusPlanLekcjiCalendar(LibrusEntity, CalendarEntity):
     """Kalendarz planu lekcji z danych pobranych przez wspolny coordinator."""
 
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
     ) -> None:
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Plan lekcji"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji_calendar"
         self._attr_icon = "mdi:calendar-school"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     def _events(self) -> List[CalendarEvent]:
         """Zwroc wszystkie poprawne wydarzenia z aktualnego cache planu."""
