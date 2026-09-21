@@ -67,5 +67,10 @@
         "name": "Plan lekcji"
       }
     }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Logowanie do Librusa nie powiodło się. Sprawdź skonfigurowany login i hasło."
+    }
   }
 }
