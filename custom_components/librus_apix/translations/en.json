@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Librus APIX Integration Setup",
+        "description": "Enter your Librus Synergia login credentials",
+        "data": {
+          "username": "Username/Login",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate with Librus",
+        "description": "Authentication for {username} expired or the password changed. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to Librus. Please check your credentials.",
+      "unknown": "Unexpected error occurred",
+      "invalid_auth": "Invalid authentication. Check your Librus username and password."
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "student_information": {
+        "name": "Student information"
+      },
+      "lucky_number": {
+        "name": "Lucky number"
+      },
+      "grades": {
+        "name": "Grades"
+      },
+      "subject_grades": {
+        "name": "{subject}"
+      },
+      "average_grade": {
+        "name": "Average grade"
+      },
+      "subject_average": {
+        "name": "Average {subject}"
+      },
+      "schedule": {
+        "name": "Schedule"
+      },
+      "homework": {
+        "name": "Homework"
+      },
+      "lesson_timetable": {
+        "name": "Lesson timetable"
+      },
+      "next_lesson": {
+        "name": "Next lesson"
+      },
+      "messages": {
+        "name": "Messages"
+      }
+    },
+    "calendar": {
+      "lesson_timetable": {
+        "name": "Lesson timetable"
+      }
+    }
+  }
+}
