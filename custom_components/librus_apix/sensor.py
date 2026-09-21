@@ -4,15 +4,14 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
-from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator
 
-from .const import DEFAULT_PLAN_DAYS, DOMAIN
-from .coordinator import LibrusDataUpdateCoordinator
+from .const import DEFAULT_PLAN_DAYS
+from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
+from .entity import LibrusEntity
 from .plan_lekcji import (
     biezacy_dzien,
     dni_do_wyswietlenia,
@@ -45,7 +44,7 @@ def _srednia_ocen(oceny: List[Dict]) -> Optional[float]:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: LibrusConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Konfiguracja platformy czujnikow Librus APIX."""
@@ -96,19 +95,6 @@ async def async_setup_entry(
     )
 
 
-def _device_info(coordinator: DataUpdateCoordinator, config_entry: ConfigEntry) -> Dict[str, Any]:
-    """Zwroc informacje o urzadzeniu."""
-    data = coordinator.data or {}
-    student_info = data.get("student_info")
-    name = student_info.name if student_info else "Librus"
-    return {
-        "identifiers": {(DOMAIN, config_entry.entry_id)},
-        "name": f"Librus - {name}",
-        "manufacturer": "Librus",
-        "model": "Synergia",
-    }
-
-
 def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
     """Okrojona lekcja do atrybutu encji.
 
@@ -118,21 +104,15 @@ def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in lekcja.items() if k not in ("przerwa_od", "przerwa_do")}
 
 
-class LibrusUczenSensor(CoordinatorEntity, SensorEntity):
+class LibrusUczenSensor(LibrusEntity, SensorEntity):
     """Czujnik z informacjami o uczniu."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Informacje o uczniu"
         self._attr_unique_id = f"{config_entry.entry_id}_uczen"
         self._attr_icon = "mdi:account-school"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[str]:
@@ -153,21 +133,15 @@ class LibrusUczenSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSzczesliwyNumerekSensor(CoordinatorEntity, SensorEntity):
+class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
     """Czujnik ze szczesliwym numerkiem dnia."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Szczesliwy numerek"
         self._attr_unique_id = f"{config_entry.entry_id}_szczesliwy_numerek"
         self._attr_icon = "mdi:numeric"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Any:
@@ -175,21 +149,15 @@ class LibrusSzczesliwyNumerekSensor(CoordinatorEntity, SensorEntity):
         return info.lucky_number if info else None
 
 
-class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
+class LibrusOcenySensor(LibrusEntity, SensorEntity):
     """Czujnik z wszystkimi ocenami pogrupowanymi wedlug przedmiotow."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Oceny"
         self._attr_unique_id = f"{config_entry.entry_id}_oceny"
         self._attr_icon = "mdi:school"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> int:
@@ -213,28 +181,22 @@ class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusPrzedmiotSensor(CoordinatorEntity, SensorEntity):
+class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
     """Czujnik z ocenami dla konkretnego przedmiotu."""
 
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
         subject: str,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
     ) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
+        super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_has_entity_name = False
         self._attr_name = subject
         self._attr_unique_id = f"{config_entry.entry_id}_przedmiot_{safe_name}"
         self._attr_icon = "mdi:book-open-variant"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[str]:
@@ -274,23 +236,17 @@ class LibrusPrzedmiotSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
+class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia wszystkich ocen biezacego semestru (do wykresu)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Srednia ocen"
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_ocen"
         self._attr_icon = "mdi:chart-line"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[float]:
@@ -316,30 +272,24 @@ class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
+class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia ocen dla konkretnego przedmiotu (do wykresu)."""
 
     def __init__(
         self,
         coordinator: LibrusDataUpdateCoordinator,
         subject: str,
-        config_entry: ConfigEntry,
+        config_entry: LibrusConfigEntry,
     ) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
+        super().__init__(coordinator, config_entry)
         self._subject = subject
         safe_name = subject.lower().replace(" ", "_").replace("/", "_")
-        self._attr_has_entity_name = False
         self._attr_name = f"Srednia {subject}"
         self._attr_unique_id = f"{config_entry.entry_id}_srednia_{safe_name}"
         self._attr_icon = "mdi:chart-bar"
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_native_unit_of_measurement = None
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> Optional[float]:
@@ -356,21 +306,15 @@ class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusTerminarzSensor(CoordinatorEntity, SensorEntity):
+class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zdarzeniami z kalendarza Librusa (biezacy + nastepny miesiac)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Terminarz"
         self._attr_unique_id = f"{config_entry.entry_id}_terminarz"
         self._attr_icon = "mdi:calendar-month"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> int:
@@ -390,21 +334,15 @@ class LibrusTerminarzSensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class LibrusZadaniaSensor(CoordinatorEntity, SensorEntity):
+class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zadaniami i sprawdzianami (30 dni do przodu)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Zadania"
         self._attr_unique_id = f"{config_entry.entry_id}_zadania"
         self._attr_icon = "mdi:calendar-check"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> int:
@@ -450,21 +388,15 @@ class _OdswiezanieCominutowe:
         return dt_util.now().replace(tzinfo=None)
 
 
-class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEntity):
+class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z planem lekcji (biezacy i nastepny tydzien)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Plan lekcji"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji"
         self._attr_icon = "mdi:timetable"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     def _plan(self) -> List[Dict]:
         return (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -523,21 +455,15 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEn
         }
 
 
-class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, CoordinatorEntity, SensorEntity):
+class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z trwajaca lub najblizsza lekcja."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Nastepna lekcja"
         self._attr_unique_id = f"{config_entry.entry_id}_nastepna_lekcja"
         self._attr_icon = "mdi:clock-start"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     def _lekcja(self) -> Optional[Dict]:
         plan = (self.coordinator.data or {}).get("plan_lekcji", [])
@@ -567,21 +493,15 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, CoordinatorEntity, Sens
         }
 
 
-class LibrusWiadomosciSensor(CoordinatorEntity, SensorEntity):
+class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
     """Czujnik z wiadomosciami (temat i nadawca, bez pobierania tresci)."""
 
-    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry) -> None:
+    def __init__(self, coordinator: LibrusDataUpdateCoordinator, config_entry: LibrusConfigEntry) -> None:
         """Inicjalizacja."""
-        super().__init__(coordinator)
-        self._config_entry = config_entry
-        self._attr_has_entity_name = False
+        super().__init__(coordinator, config_entry)
         self._attr_name = "Wiadomosci"
         self._attr_unique_id = f"{config_entry.entry_id}_wiadomosci"
         self._attr_icon = "mdi:message-text"
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        return _device_info(self.coordinator, self._config_entry)
 
     @property
     def native_value(self) -> int:
