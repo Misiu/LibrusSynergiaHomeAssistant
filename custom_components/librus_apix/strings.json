@@ -10,30 +10,20 @@
         }
       },
       "reauth_confirm": {
-        "title": "Ponowne logowanie do Librus",
-        "description": "Logowanie dla konta {username} wygasło lub hasło zostało zmienione. Podaj aktualne hasło.",
+        "title": "Reauthenticate with Librus",
+        "description": "Authentication for {username} expired or the password changed. Enter the current password.",
         "data": {
-          "password": "Hasło"
+          "password": "Password"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to Librus. Please check your credentials.",
-      "unknown": "Unexpected error occurred"
+      "unknown": "Unexpected error occurred",
+      "invalid_auth": "Invalid authentication. Check your Librus username and password."
     },
     "abort": {
       "already_configured": "Device is already configured"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Opcje Librus APIX",
-        "description": "Jak często pobierać dane z Librusa. Jedno odświeżenie to 8 zapytań (oceny, wiadomości, zadania, dane ucznia, terminarz i plan lekcji), więc przy 120 minutach wychodzi około 96 zapytań na dobę. Sensory planu przeliczają się co minutę lokalnie i nie generują dodatkowego ruchu.",
-        "data": {
-          "scan_interval_minutes": "Częstotliwość odświeżania (minuty)"
-        }
-      }
     }
   }
 }
