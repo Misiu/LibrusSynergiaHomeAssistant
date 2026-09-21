@@ -8,6 +8,13 @@
           "username": "Username/Login",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie do Librus",
+        "description": "Logowanie dla konta {username} wygasło lub hasło zostało zmienione. Podaj aktualne hasło.",
+        "data": {
+          "password": "Hasło"
+        }
       }
     },
     "error": {
