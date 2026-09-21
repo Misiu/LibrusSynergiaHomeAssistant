@@ -92,7 +92,6 @@ class LibrusPlanLekcjiCalendar(LibrusEntity, CalendarEntity):
         super().__init__(coordinator, config_entry)
         self._attr_translation_key = "lesson_timetable"
         self._attr_unique_id = f"{config_entry.entry_id}_plan_lekcji_calendar"
-        self._attr_icon = "mdi:calendar-school"
 
     def _events(self) -> List[CalendarEvent]:
         """Zwroc wszystkie poprawne wydarzenia z aktualnego cache planu."""
