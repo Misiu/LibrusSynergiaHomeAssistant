@@ -6,8 +6,9 @@ Integracja Home Assistant z systemem Librus Synergia, umożliwiająca monitorowa
 
 - 📊 **Monitoring ocen** - wszystkie oceny ze wszystkich przedmiotów
 - 📈 **Statystyki** - średnie ocen, liczba ocen, trend
-- 📧 **Wiadomości** - najnowsze wiadomości z dziennika
+- 📧 **Wiadomości** - nadawca, temat, data i status najnowszych wiadomości bez otwierania ich w Librusie
 - 🗓️ **Plan lekcji** - bieżący i następny tydzień, z zastępstwami i odwołanymi lekcjami
+- 📅 **Kalendarz planu lekcji** - natywna encja `calendar` Home Assistanta z lekcjami jako wydarzeniami
 - 🔔 **Powiadomienia** - automatyczne powiadomienia o nowych ocenach/wiadomościach
 - 🏠 **Dashboard** - piękne karty w Home Assistant
 
@@ -21,16 +22,29 @@ Integracja tworzy następujące sensory:
 | `sensor.librus_szczesliwy_numerek` | Szczęśliwy numerek dnia | numer |
 | `sensor.librus_oceny` | Wszystkie oceny bieżącego semestru | liczba ocen |
 | `sensor.librus_srednia_ocen` | **Globalna średnia** ze wszystkich przedmiotów | float (wykres 📈) |
-| `sensor.librus_wiadomosci` | Ostatnie 5 wiadomości z pełną treścią | liczba nieprzeczytanych |
+| `sensor.librus_wiadomosci` | Najnowsze wiadomości: nadawca, temat, data, status i informacja o załączniku | liczba nieprzeczytanych |
 | `sensor.librus_plan_lekcji` | Plan lekcji na bieżący i następny tydzień | liczba lekcji dzisiaj |
 | `sensor.librus_nastepna_lekcja` | Trwająca lub najbliższa lekcja (odświeżana co minutę) | nazwa przedmiotu |
 | `sensor.librus_<przedmiot>` | Oceny z danego przedmiotu (np. `sensor.librus_matematyka`) | lista ocen: "4, 3+, 5" |
 | `sensor.librus_srednia_<przedmiot>` | **Średnia** z danego przedmiotu (np. `sensor.librus_srednia_matematyka`) | float (wykres 📈) |
+| `calendar.librus_<uczen>_plan_lekcji` | Natywny kalendarz lekcji z godziną, przedmiotem, salą/nauczycielem i informacją o zmianach | bieżąca/najbliższa lekcja |
 
 Sensor `nastepna_lekcja` przelicza swój stan co minutę lokalnie — **bez dodatkowych zapytań do Librusa**
 (dane planu pobierane są razem z resztą, co 2 godziny).
 
 Sensory średnich mają `state_class: measurement` — HA automatycznie rysuje dla nich wykres historyczny po kliknięciu w encję.
+
+### Natywny kalendarz planu lekcji
+
+Encja `calendar.librus_<uczen>_plan_lekcji` korzysta z tego samego cache co sensory planu — **nie wykonuje dodatkowych zapytań do Librusa**. Home Assistant może pobierać z niej wydarzenia dla dowolnego zakresu znajdującego się w aktualnie pobranych dwóch tygodniach planu.
+
+- zwykła lekcja ma nazwę przedmiotu,
+- zastępstwo ma prefiks `[ZASTĘPSTWO]`,
+- odwołana lekcja pozostaje widoczna z prefiksem `[ODWOŁANA]`,
+- sala/nauczyciel trafia do lokalizacji wydarzenia,
+- odwołana lekcja nie jest wybierana jako bieżące/najbliższe wydarzenie kalendarza.
+
+To pozwala użyć standardowych kart kalendarza HA albo pobrać najbliższe dni do wyświetlenia np. na e-paper.
 
 ## 📦 Instalacja
 
