@@ -1,6 +1,6 @@
 """Base entities for the Librus APIX integration."""
 
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -23,6 +23,7 @@ class LibrusEntity(CoordinatorEntity[LibrusDataUpdateCoordinator]):
         student_info = coordinator.data["student_info"]
         student_name = student_info.name if student_info else "Librus"
         self._attr_device_info = DeviceInfo(
+            entry_type=DeviceEntryType.SERVICE,
             identifiers={(DOMAIN, config_entry.entry_id)},
             name=f"Librus - {student_name}",
             manufacturer="Librus",
