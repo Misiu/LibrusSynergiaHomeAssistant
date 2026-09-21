@@ -6,7 +6,9 @@ from typing import Any, Dict, List, Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from librus_apix.exceptions import AuthorizationError
 
 from .const import (
     CONF_SCAN_INTERVAL_MINUTES,
@@ -100,6 +102,11 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
             homework_raw = await self.client.async_get_homework()
             schedule_raw = await self.client.async_get_schedule()
             plan_raw = await self.client.async_get_timetable()
+
+            if isinstance(
+                getattr(self.client, "last_auth_error", None), AuthorizationError
+            ):
+                raise ConfigEntryAuthFailed("Librus rejected the credentials")
 
             prev = self.data or {}
 
