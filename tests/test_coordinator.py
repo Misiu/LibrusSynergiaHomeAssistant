@@ -5,7 +5,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from librus_apix.exceptions import AuthorizationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.librus_apix.const import DOMAIN
@@ -162,3 +164,25 @@ async def test_coordinator_jest_powiazany_z_config_entry(hass):
 
     assert coordinator.config_entry is entry
     assert coordinator.update_interval == timedelta(minutes=45)
+
+
+
+async def test_auth_rejection_przerywa_dalsze_endpointy(hass):
+    """Po bledzie autoryzacji coordinator nie wykonuje kolejnych zapytan."""
+    entry = _entry()
+    client = _client()
+    client.async_get_student_information.return_value = None
+    client.last_auth_error = AuthorizationError("bad credentials")
+
+    coordinator = LibrusDataUpdateCoordinator(
+        hass, entry, client, timedelta(hours=2)
+    )
+
+    with pytest.raises(ConfigEntryAuthFailed):
+        await coordinator._async_update_data()
+
+    client.async_get_grades.assert_not_awaited()
+    client.async_get_messages.assert_not_awaited()
+    client.async_get_homework.assert_not_awaited()
+    client.async_get_schedule.assert_not_awaited()
+    client.async_get_timetable.assert_not_awaited()
