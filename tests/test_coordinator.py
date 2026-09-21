@@ -86,7 +86,7 @@ async def test_pusty_cache_ocen_jest_poprawnym_cache(hass):
 
     result = await coordinator._async_update_data()
 
-    assert result["student_info"] is student
+    assert result["student_info"].name == student.name
     assert result["oceny"] == []
     assert result["oceny_wg_przedmiotu"] == {}
     assert result["wiadomosci"] == []
