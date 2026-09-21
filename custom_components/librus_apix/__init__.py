@@ -5,7 +5,6 @@ import logging
 import traceback
 from typing import Dict, Any
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.util import dt as dt_util
@@ -15,7 +14,7 @@ from librus_apix.client import Client, new_client
 from librus_apix.exceptions import AuthorizationError, MaintananceError, TokenError
 
 from .const import DOMAIN
-from .coordinator import LibrusDataUpdateCoordinator, _current_semester, _interwal_odswiezania
+from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator, _current_semester
 from .plan_lekcji import DNI_TYGODNIA_PL, przetworz_plan
 
 _LOGGER = logging.getLogger(__name__)
@@ -369,7 +368,7 @@ class LibrusApiClient:
             return None
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bool:
     """Set up Librus APIX from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
@@ -382,9 +381,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             raise ConfigEntryAuthFailed("Librus rejected the credentials")
         raise ConfigEntryNotReady("Librus authentication is temporarily unavailable")
     
-    coordinator = LibrusDataUpdateCoordinator(
-        hass, entry, client, _interwal_odswiezania(entry)
-    )
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
@@ -395,6 +392,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
