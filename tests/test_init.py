@@ -1,6 +1,6 @@
 """Test the Librus APIX integration."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,7 +16,7 @@ from librus_apix.exceptions import AuthorizationError, MaintananceError
 from custom_components.librus_apix.const import DOMAIN
 
 
-def _dzis() -> object:
+def _dzis() -> date:
     """Dzisiejsza data wedlug strefy Home Assistanta.
 
     Czujniki uzywaja dt_util.now(), a nie zegara systemowego. W testach HA
@@ -122,7 +122,11 @@ async def _setup(
         await hass.async_block_till_done()
 
 
-async def test_setup_entry(hass: HomeAssistant, mock_config_entry, mock_librus_client):
+async def test_setup_entry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Coordinator jest przechowywany w runtime_data wpisu config entry."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -132,7 +136,11 @@ async def test_setup_entry(hass: HomeAssistant, mock_config_entry, mock_librus_c
     assert coordinator.data["student_info"].name == "Jan Kowalski"
 
 
-async def test_unload_entry(hass: HomeAssistant, mock_config_entry, mock_librus_client):
+async def test_unload_entry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Unload usuwa encje obu platform i zatrzymuje coordinator."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -149,7 +157,11 @@ async def test_unload_entry(hass: HomeAssistant, mock_config_entry, mock_librus_
     assert hass.states.get(calendar_id).state == "unavailable"
 
 
-async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_librus_client):
+async def test_plan_lekcji_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Czujnik planu lekcji wystawia dzisiejsze lekcje i wykryte zmiany."""
     # Ostatnia lekcja konczy sie o 23:59, wiec dzien jest "biezacy" niezaleznie
     # od tego, o ktorej uruchomiono testy.
@@ -172,7 +184,11 @@ async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_l
     assert [l["przedmiot"] for l in stan.attributes["zmiany"]] == ["Fizyka"]
 
 
-async def test_nastepna_lekcja_sensor(hass: HomeAssistant, mock_config_entry, mock_librus_client):
+async def test_nastepna_lekcja_sensor(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Czujnik nastepnej lekcji wybiera pierwsza lekcje, ktora sie nie skonczyla."""
     mock_librus_client.async_get_timetable.return_value = [
         _lekcja(1, "Matematyka", "00:00", "00:01"),
@@ -189,8 +205,10 @@ async def test_nastepna_lekcja_sensor(hass: HomeAssistant, mock_config_entry, mo
 
 
 async def test_plan_lekcji_przeskakuje_na_kolejny_dzien(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Po ostatniej lekcji dnia czujnik pokazuje plan nastepnego dnia."""
     jutro = _dzis() + timedelta(days=1)
     mock_librus_client.async_get_timetable.return_value = [
@@ -218,8 +236,10 @@ async def test_plan_lekcji_przeskakuje_na_kolejny_dzien(
 
 
 async def test_plan_lekcji_trzyma_sie_dzis_w_trakcie_zajec(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Dopoki trwa ostatnia lekcja, pokazywany jest biezacy dzien."""
     mock_librus_client.async_get_timetable.return_value = [
         _lekcja(1, "Matematyka", "00:00", "23:59"),
@@ -234,8 +254,10 @@ async def test_plan_lekcji_trzyma_sie_dzis_w_trakcie_zajec(
 
 
 async def test_plan_lekcji_zaznacza_wydarzenia_i_zadania(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Kartkowka trafia na swoja lekcje, wywiadowka do wydarzen calodniowych."""
     dzis = _dzis().strftime("%Y-%m-%d")
     mock_librus_client.async_get_timetable.return_value = [
@@ -277,8 +299,10 @@ async def test_plan_lekcji_zaznacza_wydarzenia_i_zadania(
 
 
 async def test_plan_tygodnia_zawsze_pokazuje_piec_dni(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Po ostatniej lekcji dnia w planie nadal jest piec dni lekcyjnych."""
     dzis = _dzis()
     # Dzisiejsze lekcje juz sie skonczyly, kolejne szesc dni ma zajecia.
@@ -320,8 +344,10 @@ async def test_sensor_i_calendar_korzystaja_z_jednego_cyklu_api(
 
 
 async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Nowy przedmiot po pierwszym setupie dostaje sensor i sensor sredniej."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -363,8 +389,10 @@ async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
 
 
 async def test_wszystkie_encje_maja_to_samo_urzadzenie(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Sensory i kalendarz sa przypiete do jednego urzadzenia Librus."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -379,8 +407,10 @@ async def test_wszystkie_encje_maja_to_samo_urzadzenie(
 
 
 async def test_setup_bad_credentials_triggers_reauth(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Odrzucone dane logowania powinny uruchomic reauth w HA."""
     mock_config_entry.add_to_hass(hass)
     mock_librus_client.async_authenticate.return_value = False
@@ -399,8 +429,10 @@ async def test_setup_bad_credentials_triggers_reauth(
 
 
 async def test_setup_maintenance_is_retryable(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Maintenance Librusa nie powinien byc traktowany jako zle haslo."""
     mock_config_entry.add_to_hass(hass)
     mock_librus_client.async_authenticate.return_value = False
@@ -420,8 +452,10 @@ async def test_setup_maintenance_is_retryable(
 
 
 async def test_glowne_sensory_wystawiaja_spojne_dane(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Sprawdz podstawowe stany i atrybuty calego zestawu sensorow."""
     today = _dzis().strftime("%Y-%m-%d")
     mock_librus_client.async_get_messages.return_value = [
@@ -505,8 +539,10 @@ async def test_glowne_sensory_wystawiaja_spojne_dane(
 
 
 async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Zmiana danych coordinatora aktualizuje istniejace encje."""
     await _setup(hass, mock_config_entry, mock_librus_client)
     lucky_id = _entity_id(
@@ -531,8 +567,10 @@ async def test_refresh_aktualizuje_sensory_bez_ponownego_setupu(
 
 
 async def test_coordinator_ma_staly_interwal_dwie_godziny(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Polling interval jest ustalony przez integracje, nie przez uzytkownika."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -563,8 +601,10 @@ async def test_encje_uzywaja_nowych_nazw_home_assistant(
 
 
 async def test_pelna_awaria_oznacza_encje_jako_unavailable(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Pelna awaria API ustawia stan coordinatora i encji na unavailable."""
     await _setup(hass, mock_config_entry, mock_librus_client)
     sensor_id = _entity_id(hass, "sensor", mock_config_entry, "oceny")
@@ -585,8 +625,10 @@ async def test_pelna_awaria_oznacza_encje_jako_unavailable(
 
 
 async def test_czesciowa_awaria_oznacza_tylko_powiazane_encje_unavailable(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Awaria wiadomosci nie moze zdejmowac ocen, planu ani kalendarza."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
@@ -608,8 +650,10 @@ async def test_czesciowa_awaria_oznacza_tylko_powiazane_encje_unavailable(
 
 
 async def test_awaria_timetable_oznacza_plan_i_calendar_unavailable(
-    hass: HomeAssistant, mock_config_entry, mock_librus_client
-):
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
     """Awaria timetable dotyczy sensorow planu i natywnego kalendarza."""
     await _setup(hass, mock_config_entry, mock_librus_client)
 
