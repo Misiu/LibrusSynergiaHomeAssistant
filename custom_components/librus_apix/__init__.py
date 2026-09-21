@@ -6,18 +6,15 @@ import traceback
 from datetime import date
 from typing import Dict, Any
 
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import config_validation as cv
 
 from librus_apix.client import Client, new_client
 from librus_apix.exceptions import AuthorizationError, MaintananceError, TokenError
 
-from .const import DOMAIN, SCAN_INTERVAL
+from .const import DOMAIN
 from .coordinator import LibrusDataUpdateCoordinator, _current_semester, _interwal_odswiezania
 from .plan_lekcji import DNI_TYGODNIA_PL, przetworz_plan
 
@@ -25,19 +22,6 @@ _LOGGER = logging.getLogger(__name__)
 
 
 PLATFORMS = ["sensor", "calendar"]
-
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_USERNAME): cv.string,
-                vol.Required(CONF_PASSWORD): cv.string,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-
 
 class LibrusApiClient:
     """Class to interface with the Librus API."""
@@ -96,7 +80,7 @@ class LibrusApiClient:
                 from librus_apix.grades import get_grades
 
                 loop = asyncio.get_running_loop()
-                numeric_grades, average_grades, descriptive_grades = await loop.run_in_executor(
+                numeric_grades, _average_grades, descriptive_grades = await loop.run_in_executor(
                     None, get_grades, client, "all"
                 )
 
@@ -257,8 +241,6 @@ class LibrusApiClient:
 
                 from librus_apix.schedule import get_schedule
                 from datetime import date as _date
-                import calendar
-
                 today = _date.today()
                 loop = asyncio.get_running_loop()
 
@@ -385,25 +367,6 @@ class LibrusApiClient:
             )
             self._reset_auth()
             return None
-
-
-async def async_setup(hass: HomeAssistant, config: Dict[str, Any]) -> bool:
-    """Set up the Librus APIX component."""
-    hass.data.setdefault(DOMAIN, {})
-    
-    if DOMAIN in config:
-        username = config[DOMAIN][CONF_USERNAME]
-        password = config[DOMAIN][CONF_PASSWORD]
-        
-        client = LibrusApiClient(username, password)
-        hass.data[DOMAIN]["client"] = client
-        
-        # Test authentication
-        if not await client.async_authenticate():
-            _LOGGER.error("Failed to authenticate")
-            return False
-
-    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
