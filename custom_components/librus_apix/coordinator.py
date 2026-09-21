@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 from librus_apix.exceptions import AuthorizationError
 
 from .const import (
@@ -21,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def _current_semester() -> int:
     """Zwroc numer biezacego semestru wg polskiego roku szkolnego."""
-    month = date.today().month
+    month = dt_util.now().month
     return 1 if month >= 9 or month == 1 else 2
 
 
@@ -41,7 +42,7 @@ def _jest_nowa(date_str: str) -> bool:
     """Sprawdz czy data miesci sie w ostatnich 24 godzinach (dzis lub wczoraj)."""
     if not date_str:
         return False
-    wczoraj = date.today() - timedelta(days=1)
+    wczoraj = dt_util.now().date() - timedelta(days=1)
     for fmt in (
         "%d.%m.%Y %H:%M:%S",
         "%d.%m.%Y %H:%M",
