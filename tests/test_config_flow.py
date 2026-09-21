@@ -7,6 +7,7 @@ from homeassistant import config_entries, data_entry_flow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.librus_apix.config_flow import CannotConnect, InvalidAuth
 from custom_components.librus_apix.const import DOMAIN
 
 
@@ -40,7 +41,7 @@ async def test_user_flow_blad_logowania_pokazuje_cannot_connect(hass):
 
     with patch(
         "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=ValueError("Cannot connect")),
+        AsyncMock(side_effect=InvalidAuth()),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -49,7 +50,7 @@ async def test_user_flow_blad_logowania_pokazuje_cannot_connect(hass):
         )
 
     assert result["type"] is data_entry_flow.FlowResultType.FORM
-    assert result["errors"] == {"base": "cannot_connect"}
+    assert result["errors"] == {"base": "invalid_auth"}
 
 
 async def test_user_flow_blokuje_drugi_wpis_dla_tego_samego_login(hass):
@@ -118,7 +119,7 @@ async def test_reauth_bad_password_keeps_form(hass):
 
     with patch(
         "custom_components.librus_apix.config_flow.validate_input",
-        AsyncMock(side_effect=ValueError("Cannot connect")),
+        AsyncMock(side_effect=InvalidAuth()),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -137,3 +138,40 @@ async def test_reauth_bad_password_keeps_form(hass):
     assert result["step_id"] == "reauth_confirm"
     assert result["errors"] == {"base": "cannot_connect"}
     assert existing.data[CONF_PASSWORD] == "old-secret"
+
+
+
+async def test_user_flow_invalid_auth(hass):
+    """Odrzucone dane logowania maja osobny blad od awarii polaczenia."""
+    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "bad"}
+
+    with patch(
+        "custom_components.librus_apix.config_flow.validate_input",
+        AsyncMock(side_effect=InvalidAuth()),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_USER},
+            data=data,
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "invalid_auth"}
+
+
+async def test_user_flow_unknown_error(hass):
+    """Nieoczekiwany blad nie jest maskowany jako problem z haslem."""
+    data = {CONF_USERNAME: "123456", CONF_PASSWORD: "secret"}
+
+    with patch(
+        "custom_components.librus_apix.config_flow.validate_input",
+        AsyncMock(side_effect=RuntimeError("boom")),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_USER},
+            data=data,
+        )
+
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"base": "unknown"}
