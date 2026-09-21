@@ -85,6 +85,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
         self._seen_homework_ids: set = set()
         self._seen_schedule_ids: set = set()
         self._seen_plan_ids: set = set()
+        self._unavailable_sources: set[str] = set()
         self._first_run: bool = True
         super().__init__(
             hass,
@@ -138,6 +139,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
                 "schedule": schedule_raw is not None,
                 "timetable": plan_raw is not None,
             }
+            self._log_source_availability(availability)
 
             prev = self.data or {}
 
@@ -225,6 +227,20 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             raise
         except Exception as err:
             raise UpdateFailed(f"Blad komunikacji z API: {err}") from err
+
+    def _log_source_availability(self, availability: dict[str, bool]) -> None:
+        """Log source availability transitions without repeating messages."""
+        unavailable = {
+            source for source, is_available in availability.items() if not is_available
+        }
+
+        for source in sorted(unavailable - self._unavailable_sources):
+            _LOGGER.info("Librus data source %s is unavailable", source)
+
+        for source in sorted(self._unavailable_sources - unavailable):
+            _LOGGER.info("Librus data source %s is available again", source)
+
+        self._unavailable_sources = unavailable
 
     def _raise_if_auth_failed(self) -> None:
         """Przerwij cykl natychmiast po odrzuceniu danych logowania."""
