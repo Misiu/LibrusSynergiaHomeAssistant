@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -46,6 +47,17 @@ def _lekcja(numer, przedmiot, od, do, dzien=None, zastepstwo=False, odwolana=Fal
         "info": "Zastepstwo" if zastepstwo else ("Lekcja odwolana" if odwolana else ""),
         "szczegoly": {},
     }
+
+
+
+def _entity_id(hass: HomeAssistant, platform: str, entry, suffix: str) -> str:
+    """Znajdz entity_id po stabilnym unique_id integracji."""
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        platform, DOMAIN, f"{entry.entry_id}_{suffix}"
+    )
+    assert entity_id is not None
+    return entity_id
 
 
 @pytest.fixture
@@ -132,7 +144,7 @@ async def test_plan_lekcji_sensor(hass: HomeAssistant, mock_config_entry, mock_l
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_plan_lekcji")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "plan_lekcji"))
     assert stan is not None
     assert stan.state == "2"
     assert stan.attributes["pierwsza_lekcja"] == "00:00"
@@ -152,7 +164,7 @@ async def test_nastepna_lekcja_sensor(hass: HomeAssistant, mock_config_entry, mo
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_nastepna_lekcja")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "nastepna_lekcja"))
     assert stan is not None
     assert stan.state == "Fizyka"
     assert stan.attributes["numer"] == 2
@@ -173,7 +185,7 @@ async def test_plan_lekcji_przeskakuje_na_kolejny_dzien(
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_plan_lekcji")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "plan_lekcji"))
     assert [l["przedmiot"] for l in stan.attributes["tydzien"][stan.attributes["biezacy_dzien_data"]]] == [
         "Historia",
         "Chemia",
@@ -199,7 +211,7 @@ async def test_plan_lekcji_trzyma_sie_dzis_w_trakcie_zajec(
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_plan_lekcji")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "plan_lekcji"))
     assert [l["przedmiot"] for l in stan.attributes["tydzien"][stan.attributes["biezacy_dzien_data"]]] == ["Matematyka"]
     assert stan.attributes["biezacy_dzien_data"] == _dzis().strftime("%Y-%m-%d")
 
@@ -235,7 +247,7 @@ async def test_plan_lekcji_zaznacza_wydarzenia_i_zadania(
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_plan_lekcji")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "plan_lekcji"))
     lekcje = {l["przedmiot"]: l for l in stan.attributes["tydzien"][stan.attributes["biezacy_dzien_data"]]}
 
     assert [w["tytul"] for w in lekcje["fizyka"]["wydarzenia"]] == ["kartkówka"]
@@ -262,7 +274,7 @@ async def test_plan_tygodnia_zawsze_pokazuje_piec_dni(
 
     await _setup(hass, mock_config_entry, mock_librus_client)
 
-    stan = hass.states.get("sensor.librus_jan_kowalski_plan_lekcji")
+    stan = hass.states.get(_entity_id(hass, "sensor", mock_config_entry, "plan_lekcji"))
     tydzien = stan.attributes["tydzien"]
 
     assert len(tydzien) == 5, f"oczekiwano 5 dni, jest {len(tydzien)}: {list(tydzien)}"
@@ -338,16 +350,9 @@ async def test_koordynator_uzywa_interwalu_z_opcji(
         await hass.async_block_till_done()
 
     # Koordynator jest wspoldzielony przez wszystkie encje platformy.
-    from homeassistant.helpers import entity_registry as er
-    rejestr = er.async_get(hass)
-    encje = er.async_entries_for_config_entry(rejestr, mock_config_entry.entry_id)
-    assert encje, "brak encji - platforma sie nie skonfigurowala"
-
+    entity_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
     komponent = hass.data["entity_components"]["sensor"]
-    encja = next(
-        e for e in komponent.entities
-        if e.entity_id.endswith("_plan_lekcji")
-    )
+    encja = next(e for e in komponent.entities if e.entity_id == entity_id)
     assert encja.coordinator.update_interval == timedelta(minutes=45)
 
 
@@ -361,15 +366,15 @@ async def test_sensor_i_calendar_uzywaja_tego_samego_koordynatora(
     sensor_component = hass.data["entity_components"]["sensor"]
     calendar_component = hass.data["entity_components"]["calendar"]
 
+    sensor_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
+    calendar_id = _entity_id(
+        hass, "calendar", mock_config_entry, "plan_lekcji_calendar"
+    )
     sensor_entity = next(
-        entity
-        for entity in sensor_component.entities
-        if entity.unique_id == f"{mock_config_entry.entry_id}_plan_lekcji"
+        entity for entity in sensor_component.entities if entity.entity_id == sensor_id
     )
     calendar_entity = next(
-        entity
-        for entity in calendar_component.entities
-        if entity.unique_id == f"{mock_config_entry.entry_id}_plan_lekcji_calendar"
+        entity for entity in calendar_component.entities if entity.entity_id == calendar_id
     )
 
     assert sensor_entity.coordinator is calendar_entity.coordinator
