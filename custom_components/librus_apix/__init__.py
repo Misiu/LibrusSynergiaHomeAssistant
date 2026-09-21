@@ -3,12 +3,12 @@
 import asyncio
 import logging
 import traceback
-from datetime import date
 from typing import Dict, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.util import dt as dt_util
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 
 from librus_apix.client import Client, new_client
@@ -204,7 +204,7 @@ class LibrusApiClient:
                 from librus_apix.homework import get_homework
                 from datetime import date as _date, timedelta
 
-                today = _date.today()
+                today = dt_util.now().date()
                 date_from = today.strftime("%Y-%m-%d")
                 date_to = (today + timedelta(days=30)).strftime("%Y-%m-%d")
 
@@ -241,7 +241,7 @@ class LibrusApiClient:
 
                 from librus_apix.schedule import get_schedule
                 from datetime import date as _date
-                today = _date.today()
+                today = dt_util.now().date()
                 loop = asyncio.get_running_loop()
 
                 def _fetch_two_months():
@@ -310,7 +310,7 @@ class LibrusApiClient:
                 from librus_apix.exceptions import ParseError
                 from datetime import datetime as _datetime, timedelta
 
-                today = date.today()
+                today = dt_util.now().date()
                 monday = today - timedelta(days=today.weekday())
                 loop = asyncio.get_running_loop()
 
