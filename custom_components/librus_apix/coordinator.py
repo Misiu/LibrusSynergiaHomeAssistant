@@ -231,7 +231,10 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
         if isinstance(
             getattr(self.client, "last_auth_error", None), AuthorizationError
         ):
-            raise ConfigEntryAuthFailed("Librus rejected the credentials")
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="invalid_auth",
+            )
 
     def _fire_events(self, messages: List[Dict], grades: List[Dict]) -> None:
         """Wyslij zdarzenia HA dla nowych wiadomosci i ocen."""
