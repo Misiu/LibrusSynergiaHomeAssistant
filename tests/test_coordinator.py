@@ -2,7 +2,7 @@
 
 from datetime import date, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -46,11 +46,10 @@ def _client():
         (date(2027, 7, 1), 2),
     ],
 )
-def test_current_semester(day, expected):
+def test_current_semester(freezer, day, expected):
     """Styczen nadal nalezy do pierwszego semestru."""
-    with patch("custom_components.librus_apix.coordinator.date") as mocked_date:
-        mocked_date.today.return_value = day
-        assert _current_semester() == expected
+    freezer.move_to(day)
+    assert _current_semester() == expected
 
 
 async def test_pierwszy_blad_ocen_bez_cache_powoduje_update_failed(hass):
