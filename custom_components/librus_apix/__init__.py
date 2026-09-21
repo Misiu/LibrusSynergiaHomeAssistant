@@ -378,7 +378,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bo
     # Test authentication
     if not await client.async_authenticate():
         if isinstance(client.last_auth_error, AuthorizationError):
-            raise ConfigEntryAuthFailed("Librus rejected the credentials")
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="invalid_auth",
+            )
         raise ConfigEntryNotReady("Librus authentication is temporarily unavailable")
     
     coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
