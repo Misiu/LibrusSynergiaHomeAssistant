@@ -15,6 +15,13 @@
         "data": {
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Librus",
+        "description": "Update the password for Librus account {username}.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
