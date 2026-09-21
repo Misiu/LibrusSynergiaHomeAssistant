@@ -673,3 +673,42 @@ async def test_awaria_timetable_oznacza_plan_i_calendar_unavailable(
     assert hass.states.get(plan_id).state == "unavailable"
     assert hass.states.get(next_id).state == "unavailable"
     assert hass.states.get(calendar_id).state == "unavailable"
+
+
+
+async def test_homeassistant_update_entity_refreshes_shared_coordinator(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_librus_client: MagicMock,
+) -> None:
+    """HA's generic update action refreshes all data through one coordinator."""
+    await _setup(hass, mock_config_entry, mock_librus_client)
+
+    plan_id = _entity_id(hass, "sensor", mock_config_entry, "plan_lekcji")
+    lucky_id = _entity_id(
+        hass, "sensor", mock_config_entry, "szczesliwy_numerek"
+    )
+    initial_timetable_calls = mock_librus_client.async_get_timetable.await_count
+
+    mock_librus_client.async_get_student_information.return_value = SimpleNamespace(
+        name="Jan Kowalski",
+        class_name="8A",
+        number=7,
+        tutor="Anna Nowak",
+        school="SP nr 1",
+        lucky_number=42,
+    )
+
+    await hass.services.async_call(
+        "homeassistant",
+        "update_entity",
+        {"entity_id": plan_id},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert (
+        mock_librus_client.async_get_timetable.await_count
+        == initial_timetable_calls + 1
+    )
+    assert hass.states.get(lucky_id).state == "42"
