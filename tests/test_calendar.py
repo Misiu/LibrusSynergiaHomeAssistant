@@ -62,7 +62,7 @@ def test_calendar_icon_translation_matches_icons_json() -> None:
         (
             Path(__file__).parents[1]
             / "custom_components"
-            / "librus_apix"
+            / "librus"
             / "icons.json"
         ).read_text(encoding="utf-8")
     )
