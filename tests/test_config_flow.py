@@ -1,4 +1,4 @@
-"""Tests for the Librus APIX config flow."""
+"""Tests for the Librus Synergia config flow."""
 
 from unittest.mock import MagicMock, patch
 
@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from librus_apix.exceptions import AuthorizationError, MaintananceError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.librus_apix.const import DOMAIN
+from custom_components.librus.const import DOMAIN
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +45,7 @@ async def test_user_flow_creates_entry(
     result = await _run_user_flow(hass, librus_client)
 
     assert result["type"] is data_entry_flow.FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Librus APIX (123456)"
+    assert result["title"] == "Librus Synergia (123456)"
     assert result["data"] == {
         CONF_USERNAME: "123456",
         CONF_PASSWORD: "secret",
@@ -94,7 +94,7 @@ async def test_user_flow_blocks_duplicate_username(
     """The same Librus account cannot be configured twice."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -115,7 +115,7 @@ async def test_reauth_success_updates_password(
     """Reauth keeps the username and updates the password."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -149,7 +149,7 @@ async def test_reauth_invalid_password_keeps_form(
     """Rejected replacement password does not overwrite stored credentials."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -182,7 +182,7 @@ async def test_reconfigure_success_updates_password(
     """Reconfigure validates and updates the password."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -215,7 +215,7 @@ async def test_reconfigure_invalid_auth_can_recover(
     """Reconfigure remains open after invalid auth and can then recover."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -255,7 +255,7 @@ async def test_reconfigure_cannot_connect(
     """Temporary Librus failure keeps the reconfigure form open."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -299,7 +299,7 @@ async def test_reauth_unknown_error_can_recover(
     """Reauth can recover after an unexpected validation error."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)
@@ -337,7 +337,7 @@ async def test_reconfigure_unknown_error_can_recover(
     """Reconfigure can recover after an unexpected validation error."""
     existing = MockConfigEntry(
         domain=DOMAIN,
-        title="Librus APIX (123456)",
+        title="Librus Synergia (123456)",
         data={CONF_USERNAME: "123456", CONF_PASSWORD: "old-secret"},
     )
     existing.add_to_hass(hass)

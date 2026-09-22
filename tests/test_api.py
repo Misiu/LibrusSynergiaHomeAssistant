@@ -9,7 +9,7 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from librus_apix.exceptions import AuthorizationError, MaintananceError, ParseError, TokenError
 
-from custom_components.librus_apix.api import LibrusApiClient
+from custom_components.librus.api import LibrusApiClient
 
 
 def _authenticated_client() -> LibrusApiClient:
@@ -26,7 +26,7 @@ async def test_authenticate_success() -> None:
     token = object()
     client.get_token.return_value = token
 
-    with patch("custom_components.librus_apix.api.new_client", return_value=client):
+    with patch("custom_components.librus.api.new_client", return_value=client):
         assert await api.async_authenticate() is True
 
     assert api._client is client
@@ -48,7 +48,7 @@ async def test_authenticate_failures_reset_state(error: Exception) -> None:
     client = MagicMock()
     client.get_token.side_effect = error
 
-    with patch("custom_components.librus_apix.api.new_client", return_value=client):
+    with patch("custom_components.librus.api.new_client", return_value=client):
         assert await api.async_authenticate() is False
 
     assert api._client is None
@@ -65,7 +65,7 @@ async def test_async_call_reauthenticates_after_token_error() -> None:
     call = MagicMock(side_effect=[TokenError("expired"), "ok"])
 
     with patch(
-        "custom_components.librus_apix.api.new_client",
+        "custom_components.librus.api.new_client",
         return_value=replacement_client,
     ):
         result = await api._async_call("test", call)
@@ -84,7 +84,7 @@ async def test_async_call_returns_none_after_two_failures() -> None:
     call = MagicMock(side_effect=RuntimeError("offline"))
 
     with patch(
-        "custom_components.librus_apix.api.new_client",
+        "custom_components.librus.api.new_client",
         return_value=replacement_client,
     ):
         assert await api._async_call("test", call) is None
@@ -107,7 +107,7 @@ async def test_get_grades_filters_semester_and_non_numeric_descriptions(
 ) -> None:
     """Grades expose only current-semester numeric values."""
     freezer.move_to("2026-09-21")
-    caplog.set_level(logging.DEBUG, logger="custom_components.librus_apix.api")
+    caplog.set_level(logging.DEBUG, logger="custom_components.librus.api")
     api = _authenticated_client()
     numeric_current = SimpleNamespace(
         semester=1,
@@ -198,7 +198,7 @@ async def test_get_grades_returns_none_on_api_failure() -> None:
 
     with (
         patch("librus_apix.grades.get_grades", side_effect=RuntimeError("offline")),
-        patch("custom_components.librus_apix.api.new_client", return_value=replacement_client),
+        patch("custom_components.librus.api.new_client", return_value=replacement_client),
     ):
         assert await api.async_get_grades() is None
 
@@ -286,7 +286,7 @@ async def test_get_timetable_tolerates_empty_week(
             side_effect=[ParseError("empty"), second_week],
         ) as get_timetable,
         patch(
-            "custom_components.librus_apix.api.przetworz_plan",
+            "custom_components.librus.api.przetworz_plan",
             return_value=[{"przedmiot": "Matematyka"}],
         ) as process,
     ):

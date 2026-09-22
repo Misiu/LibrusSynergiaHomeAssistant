@@ -1,4 +1,4 @@
-"""Platforma kalendarza planu lekcji dla integracji Librus APIX."""
+"""Platforma kalendarza planu lekcji dla integracji Librus Synergia."""
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional

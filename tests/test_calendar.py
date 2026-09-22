@@ -1,4 +1,4 @@
-"""Testy kalendarza planu lekcji Librus APIX."""
+"""Testy kalendarza planu lekcji Librus Synergia."""
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -8,7 +8,7 @@ from freezegun.api import FrozenDateTimeFactory
 
 from homeassistant.util import dt as dt_util
 
-from custom_components.librus_apix.calendar import (
+from custom_components.librus.calendar import (
     LibrusPlanLekcjiCalendar,
     _lesson_to_event,
 )

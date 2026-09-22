@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Librus APIX Integration - Quick Start Script
+# Librus Synergia Integration - Quick Start Script
 
-echo "🎓 Starting Librus APIX Integration Test Environment"
+echo "🎓 Starting Librus Synergia Integration Test Environment"
 echo "=================================================="
 
 # Check if Docker is installed
@@ -25,7 +25,7 @@ mkdir -p themes
 # Copy integration files
 echo "📋 Copying integration files..."
 if [ -d "custom_components" ]; then
-    cp -r custom_components/librus_apix config/custom_components/
+    cp -r custom_components/librus config/custom_components/
     echo "✅ Integration copied successfully"
 else
     echo "❌ Custom components not found!"
@@ -62,7 +62,7 @@ echo "=================================================="
 echo "1. Open Home Assistant: http://localhost:8123"
 echo "2. Complete the initial setup wizard"
 echo "3. Go to Configuration > Integrations"
-echo "4. Add 'Librus APIX' integration"
+echo "4. Add 'Librus Synergia' integration"
 echo "5. Enter your Librus credentials"
 echo ""
 echo "📝 Optional: Edit files in Code Server: http://localhost:8443"

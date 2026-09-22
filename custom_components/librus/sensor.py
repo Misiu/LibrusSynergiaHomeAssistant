@@ -1,4 +1,4 @@
-"""Platforma czujników dla integracji Librus APIX."""
+"""Platforma czujników dla integracji Librus Synergia."""
 
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -56,7 +56,7 @@ async def async_setup_entry(
     config_entry: LibrusConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Konfiguracja platformy czujnikow Librus APIX."""
+    """Konfiguracja platformy czujnikow Librus Synergia."""
     coordinator = config_entry.runtime_data
 
     entities: List[SensorEntity] = [

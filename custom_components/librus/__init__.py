@@ -1,4 +1,4 @@
-"""The Librus APIX integration."""
+"""The Librus Synergia integration."""
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
@@ -12,7 +12,7 @@ from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CALENDAR]
 
 async def async_setup_entry(hass: HomeAssistant, entry: LibrusConfigEntry) -> bool:
-    """Set up Librus APIX from a config entry."""
+    """Set up Librus Synergia from a config entry."""
     username = entry.data[CONF_USERNAME]
     password = entry.data[CONF_PASSWORD]
  

@@ -1,4 +1,4 @@
-"""Testy wspolnego coordinatora Librus APIX."""
+"""Testy wspolnego coordinatora Librus Synergia."""
 
 from datetime import date, timedelta
 from types import SimpleNamespace
@@ -12,8 +12,8 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from librus_apix.exceptions import AuthorizationError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.librus_apix.const import DOMAIN
-from custom_components.librus_apix.coordinator import (
+from custom_components.librus.const import DOMAIN
+from custom_components.librus.coordinator import (
     EVENT_NOWA_OCENA,
     EVENT_NOWA_WIADOMOSC,
     EVENT_NOWE_ZADANIE,

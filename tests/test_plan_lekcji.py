@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from custom_components.librus_apix.plan_lekcji import (
+from custom_components.librus.plan_lekcji import (
     biezacy_dzien,
     dni_do_wyswietlenia,
     lekcje_dnia,
@@ -375,7 +375,7 @@ def test_limit_liczony_po_odfiltrowaniu_zakonczonych_dni():
 
 def test_plan_helpers_reject_invalid_values() -> None:
     """Helper parsers reject malformed Librus values safely."""
-    from custom_components.librus_apix.plan_lekcji import (
+    from custom_components.librus.plan_lekcji import (
         _data_iso,
         _numer_lekcji,
         _polacz,

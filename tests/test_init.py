@@ -1,4 +1,4 @@
-"""Test the Librus APIX integration."""
+"""Test the Librus Synergia integration."""
 
 from datetime import date, timedelta
 from types import SimpleNamespace
@@ -18,7 +18,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from librus_apix.exceptions import AuthorizationError, MaintananceError
 
-from custom_components.librus_apix.const import DOMAIN
+from custom_components.librus.const import DOMAIN
 
 
 def _dzis() -> date:
@@ -127,7 +127,7 @@ async def _setup(
 ) -> None:
     """Skonfiguruj integracje z zamockowanym klientem."""
     entry.add_to_hass(hass)
-    with patch("custom_components.librus_apix.LibrusApiClient", return_value=client):
+    with patch("custom_components.librus.LibrusApiClient", return_value=client):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
 
@@ -460,7 +460,7 @@ async def test_nowy_przedmiot_dodaje_encje_po_refreshu(
     registry.async_update_entity(srednia_id, disabled_by=None)
 
     with patch(
-        "custom_components.librus_apix.LibrusApiClient",
+        "custom_components.librus.LibrusApiClient",
         return_value=mock_librus_client,
     ):
         assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
@@ -621,7 +621,7 @@ async def test_setup_bad_credentials_triggers_reauth(
     mock_librus_client.last_auth_error = AuthorizationError("bad credentials")
 
     with patch(
-        "custom_components.librus_apix.LibrusApiClient",
+        "custom_components.librus.LibrusApiClient",
         return_value=mock_librus_client,
     ):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
@@ -643,7 +643,7 @@ async def test_setup_maintenance_is_retryable(
     mock_librus_client.last_auth_error = MaintananceError("maintenance")
 
     with patch(
-        "custom_components.librus_apix.LibrusApiClient",
+        "custom_components.librus.LibrusApiClient",
         return_value=mock_librus_client,
     ):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)

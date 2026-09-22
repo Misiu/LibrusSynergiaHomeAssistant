@@ -1,4 +1,4 @@
-"""Config flow for Librus APIX integration."""
+"""Config flow for Librus Synergia integration."""
 
 import logging
 from collections.abc import Mapping
@@ -65,11 +65,11 @@ async def validate_input(
     if not token:
         raise InvalidAuth
 
-    return {"title": f"Librus APIX ({username})"}
+    return {"title": f"Librus Synergia ({username})"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Librus APIX."""
+    """Handle a config flow for Librus Synergia."""
 
     VERSION = 1
 

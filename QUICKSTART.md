@@ -36,7 +36,7 @@ docker-compose logs -f homeassistant
 2. Przejdź przez kreator konfiguracji HA
 3. Idź do `Configuration` > `Integrations`
 4. Kliknij `+ ADD INTEGRATION`
-5. Wyszukaj `Librus APIX`
+5. Wyszukaj `Librus Synergia`
 6. Podaj swoje dane logowania do Librus
 7. Ciesz się nowymi sensorami! 🎉
 

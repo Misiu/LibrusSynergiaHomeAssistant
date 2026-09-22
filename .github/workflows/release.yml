@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, e.g. 1.5.0"
+        description: "Version to release, e.g. 1.0.0"
         required: true
         type: string
 
@@ -60,11 +60,11 @@ jobs:
           version = os.environ["RELEASE_VERSION"].strip()
           if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", version):
               raise SystemExit(
-                  "Version must be a semantic version without a leading 'v', e.g. 1.6.0"
+                  "Version must be a semantic version without a leading 'v', e.g. 1.0.0"
               )
 
           manifest = json.loads(
-              Path("custom_components/librus_apix/manifest.json").read_text(
+              Path("custom_components/librus/manifest.json").read_text(
                   encoding="utf-8"
               )
           )
@@ -95,13 +95,13 @@ jobs:
         run: pip install -r requirements_test.txt
 
       - name: Ruff check
-        run: ruff check --select E9,F custom_components/librus_apix tests
+        run: ruff check --select E9,F custom_components/librus tests
 
       - name: Compile integration
-        run: python -m compileall -q custom_components/librus_apix tests
+        run: python -m compileall -q custom_components/librus tests
 
       - name: Run tests
-        run: python -m pytest -q --cov=custom_components/librus_apix --cov-report=term-missing --cov-fail-under=95
+        run: python -m pytest -q --cov=custom_components/librus --cov-report=term-missing --cov-fail-under=95
 
       - name: Run hassfest
         uses: home-assistant/actions/hassfest@master
@@ -131,7 +131,7 @@ jobs:
             --repo "$REPOSITORY"
             --target "$COMMIT_SHA"
             --generate-notes
-            --title "Librus Synergia HA $VERSION"
+            --title "Librus Synergia $VERSION"
           )
 
           if [[ "$PRERELEASE" == "true" ]]; then
