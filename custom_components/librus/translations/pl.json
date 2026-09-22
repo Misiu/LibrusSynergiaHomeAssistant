@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Konfiguracja Librus APIX",
+        "title": "Konfiguracja Librus Synergia",
         "description": "Podaj dane logowania do Librus Synergia",
         "data": {
           "username": "Login",

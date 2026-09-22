@@ -1,4 +1,4 @@
-"""Wspolny koordynator danych dla integracji Librus APIX."""
+"""Wspolny koordynator danych dla integracji Librus Synergia."""
 
 import logging
 from datetime import datetime, timedelta

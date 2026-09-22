@@ -1,4 +1,4 @@
-# Basic configuration for testing Librus APIX integration
+# Basic configuration for testing Librus Synergia integration
 
 # Bez tego HA startuje w UTC, a szablony uzywajace now() pokazuja
 # godziny przesuniete wzgledem zegara uzytkownika.
@@ -11,7 +11,7 @@ default_config:
 logger:
   default: info
   logs:
-    custom_components.librus_apix: debug
+    custom_components.librus: debug
     librus_apix: debug
 
 # Frontend themes

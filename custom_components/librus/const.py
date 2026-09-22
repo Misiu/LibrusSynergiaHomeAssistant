@@ -1,6 +1,6 @@
-"""Constants for the Librus APIX integration."""
+"""Constants for the Librus Synergia integration."""
 
-DOMAIN = "librus_apix"
+DOMAIN = "librus"
 DEFAULT_NAME = "Librus"
 
 # Configuration keys

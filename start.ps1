@@ -1,7 +1,7 @@
-# Librus APIX Integration - Quick Start Script for Windows
+# Librus Synergia Integration - Quick Start Script for Windows
 # PowerShell version
 
-Write-Host "🎓 Starting Librus APIX Integration Test Environment" -ForegroundColor Green
+Write-Host "🎓 Starting Librus Synergia Integration Test Environment" -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
 
 # Check if Docker is installed
@@ -30,7 +30,7 @@ New-Item -ItemType Directory -Force -Path "themes" | Out-Null
 # Copy integration files
 Write-Host "📋 Copying integration files..." -ForegroundColor Yellow
 if (Test-Path "custom_components") {
-    Copy-Item -Path "custom_components\librus_apix" -Destination "config\custom_components\" -Recurse -Force
+    Copy-Item -Path "custom_components\librus" -Destination "config\custom_components\" -Recurse -Force
     Write-Host "✅ Integration copied successfully" -ForegroundColor Green
 } else {
     Write-Host "❌ Custom components not found!" -ForegroundColor Red
@@ -70,7 +70,7 @@ Write-Host "=================================================="
 Write-Host "1. Open Home Assistant: http://localhost:8123" -ForegroundColor White
 Write-Host "2. Complete the initial setup wizard" -ForegroundColor White
 Write-Host "3. Go to Configuration > Integrations" -ForegroundColor White
-Write-Host "4. Add 'Librus APIX' integration" -ForegroundColor White
+Write-Host "4. Add 'Librus Synergia' integration" -ForegroundColor White
 Write-Host "5. Enter your Librus credentials" -ForegroundColor White
 Write-Host ""
 Write-Host "📝 Optional: Edit files in Code Server: http://localhost:8443" -ForegroundColor Cyan

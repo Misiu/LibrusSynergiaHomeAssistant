@@ -6,7 +6,7 @@ param(
     [string]$Message
 )
 
-$ManifestPath = "custom_components\librus_apix\manifest.json"
+$ManifestPath = "custom_components\librus\manifest.json"
 
 # Read manifest
 $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json

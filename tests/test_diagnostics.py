@@ -1,4 +1,4 @@
-"""Tests for Librus APIX diagnostics."""
+"""Tests for Librus Synergia diagnostics."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -7,8 +7,8 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.librus_apix.const import DOMAIN
-from custom_components.librus_apix.diagnostics import async_get_config_entry_diagnostics
+from custom_components.librus.const import DOMAIN
+from custom_components.librus.diagnostics import async_get_config_entry_diagnostics
 
 
 async def test_diagnostics_redacts_credentials_and_returns_counts(

@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Librus APIX Integration Setup",
+        "title": "Librus Synergia Integration Setup",
         "description": "Enter your Librus Synergia login credentials",
         "data": {
           "username": "Username/Login",

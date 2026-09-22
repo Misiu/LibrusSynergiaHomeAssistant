@@ -1,6 +1,8 @@
-# 🎓 Librus APIX Integration for Home Assistant
+# 🎓 Librus Synergia for Home Assistant
 
 Integracja Home Assistant z systemem Librus Synergia, umożliwiająca monitorowanie ocen, wiadomości i innych danych szkolnych.
+
+**Domena integracji:** `librus`
 
 ## ✨ Funkcje
 
@@ -16,18 +18,26 @@ Integracja Home Assistant z systemem Librus Synergia, umożliwiająca monitorowa
 
 Integracja tworzy następujące sensory:
 
-| Sensor | Opis | Wartość |
+| Encja | Opis | Wartość |
 |--------|------|---------|
-| `sensor.librus_uczen` | Informacje o uczniu (klasa, wychowawca, szkoła) | imię i nazwisko |
-| `sensor.librus_szczesliwy_numerek` | Szczęśliwy numerek dnia | numer |
-| `sensor.librus_oceny` | Wszystkie oceny bieżącego semestru | liczba ocen |
-| `sensor.librus_srednia_ocen` | **Globalna średnia** ze wszystkich przedmiotów | float (wykres 📈) |
-| `sensor.librus_wiadomosci` | Najnowsze wiadomości: nadawca, temat, data, status i informacja o załączniku | liczba nieprzeczytanych |
-| `sensor.librus_plan_lekcji` | Plan lekcji na bieżący i następny tydzień | liczba lekcji dzisiaj |
-| `sensor.librus_nastepna_lekcja` | Trwająca lub najbliższa lekcja (odświeżana co minutę) | nazwa przedmiotu |
-| `sensor.librus_<przedmiot>` | Oceny z danego przedmiotu (np. `sensor.librus_matematyka`) | lista ocen: "4, 3+, 5" |
-| `sensor.librus_srednia_<przedmiot>` | **Średnia** z danego przedmiotu (np. `sensor.librus_srednia_matematyka`) | float (wykres 📈) |
-| `calendar.librus_<uczen>_plan_lekcji` | Natywny kalendarz lekcji z godziną, przedmiotem, salą/nauczycielem i informacją o zmianach | bieżąca/najbliższa lekcja |
+| `sensor.librus_jan_maat_informacje_o_uczniu` | Informacje o uczniu (klasa, wychowawca, szkoła) | imię i nazwisko |
+| `sensor.librus_jan_maat_szczesliwy_numerek` | Szczęśliwy numerek dnia | numer |
+| `sensor.librus_jan_maat_oceny` | Wszystkie oceny bieżącego semestru | liczba ocen |
+| `sensor.librus_jan_maat_srednia_ocen` | Globalna średnia ze wszystkich przedmiotów | float |
+| `sensor.librus_jan_maat_wiadomosci` | Najnowsze wiadomości bez otwierania ich w Librusie | liczba nieprzeczytanych |
+| `sensor.librus_jan_maat_zadania` | Zadania domowe | liczba zadań |
+| `sensor.librus_jan_maat_terminarz` | Terminarz Librusa | liczba wydarzeń |
+| `sensor.librus_jan_maat_plan_lekcji` | Legacy sensor planu lekcji | liczba lekcji dzisiaj |
+| `sensor.librus_jan_maat_nastepna_lekcja` | Trwająca lub najbliższa lekcja | nazwa przedmiotu |
+| `sensor.librus_jan_maat_matematyka` | Oceny z konkretnego przedmiotu | lista ocen, np. `4, 3+, 5` |
+| `sensor.librus_jan_maat_srednia_matematyka` | Średnia z konkretnego przedmiotu | float |
+| `calendar.librus_jan_maat_plan_lekcji` | Natywny kalendarz planu lekcji | bieżąca/najbliższa lekcja |
+
+> Przykłady wyżej zakładają ucznia **Jan Maat** i polski język Home Assistanta.
+> Home Assistant tworzy `entity_id` z nazwy urządzenia `Librus - <uczeń>` oraz
+> przetłumaczonej nazwy encji, dlatego u Ciebie nazwy będą miały ten sam schemat,
+> np. `sensor.librus_jan_maat_plan_lekcji`. Po utworzeniu encji jej `entity_id`
+> można też ręcznie zmienić w Home Assistant.
 
 Sensor `nastepna_lekcja` przelicza swój stan co minutę lokalnie — **bez dodatkowych zapytań do Librusa**
 (dane planu pobierane są razem z resztą, co 2 godziny).
@@ -43,7 +53,7 @@ włączyć w dowolnym momencie w ustawieniach urządzenia/integracji Home Assist
 
 ### Natywny kalendarz planu lekcji
 
-Encja `calendar.librus_<uczen>_plan_lekcji` korzysta z tego samego cache co sensory planu — **nie wykonuje dodatkowych zapytań do Librusa**. Home Assistant może pobierać z niej wydarzenia dla dowolnego zakresu znajdującego się w aktualnie pobranych dwóch tygodniach planu.
+Encja `calendar.librus_jan_maat_plan_lekcji` korzysta z tego samego cache co sensory planu — **nie wykonuje dodatkowych zapytań do Librusa**. Home Assistant może pobierać z niej wydarzenia dla dowolnego zakresu znajdującego się w aktualnie pobranych dwóch tygodniach planu.
 
 - zwykła lekcja ma nazwę przedmiotu,
 - zastępstwo ma prefiks `[ZASTĘPSTWO]`,
@@ -71,22 +81,22 @@ Lub ręcznie:
 5. W polu **Category** wybierz: **`Integration`**  
    ⚠️ **NIE wybieraj "AppDaemon", "Plugin" ani żadnej innej opcji!**
 6. Kliknij **ADD**
-7. Znajdź **"Librus Synergia HA"** na liście i zainstaluj
+7. Znajdź **"Librus Synergia"** na liście i zainstaluj
 8. Restartuj Home Assistant
 
 > **Uwaga:** Błąd *"is not a valid app repository"* pojawia się, gdy w kroku 5 zostanie wybrana nieprawidłowa kategoria (np. "AppDaemon"). Upewnij się, że wybrano **Integration**.
 
 ### Opcja 2: Instalacja manualna
 
-1. Skopiuj folder `custom_components/librus_apix` do `config/custom_components/`
+1. Skopiuj folder `custom_components/librus` do `config/custom_components/`
 2. Restartuj Home Assistant
 3. Idź do Konfiguracja > Integracje > Dodaj integrację
-4. Wyszukaj "Librus APIX"
+4. Wyszukaj "Librus Synergia"
 
 ## ⚙️ Konfiguracja
 
 1. W Home Assistant: **Konfiguracja** > **Integracje** > **Dodaj integrację**
-2. Wyszukaj **"Librus APIX"**  
+2. Wyszukaj **"Librus Synergia"**  
 3. Podaj swoje dane logowania do Librus Synergia:
    - **Login/Username**: Twój login do Librus
    - **Hasło**: Twoje hasło do Librus
@@ -124,11 +134,11 @@ restartu integracji.
 | Legacy sensor planu lekcji *(domyślnie wyłączony)* | `timetable + schedule + homework` |
 
 Przykład: jeżeli po bootstrapie zostawisz aktywny wyłącznie
-`calendar.librus_<uczen>_plan_lekcji`, kolejne refreshe pobierają tylko
+`calendar.librus_jan_maat_plan_lekcji`, kolejne refreshe pobierają tylko
 `timetable`. Jeśli włączysz dodatkowo encje ocen, coordinator pobierze
 `timetable + grades`.
 
-Legacy `sensor.librus_<uczen>_plan_lekcji` jest dla nowych instalacji
+Legacy `sensor.librus_jan_maat_plan_lekcji` jest dla nowych instalacji
 **wyłączony domyślnie**. Zalecanym sposobem korzystania z planu jest natywny
 kalendarz Home Assistanta. Sensor legacy pozostaje dostępny ze względu na
 kompatybilność ze starszymi dashboardami.
@@ -139,7 +149,7 @@ z tego samego context-aware coordinatora:
 ```yaml
 action: homeassistant.update_entity
 target:
-  entity_id: calendar.librus_imie_nazwisko_plan_lekcji
+  entity_id: calendar.librus_jan_maat_plan_lekcji
 ```
 
 > `Następna lekcja` oraz legacy `Plan lekcji` przeliczają swój stan
@@ -171,11 +181,11 @@ docker-compose up -d
 type: entities
 title: "📚 Oceny Librus"
 entities:
-  - entity: sensor.librus_srednia_ocen
+  - entity: sensor.librus_jan_maat_srednia_ocen
     name: "Globalna średnia"
-  - entity: sensor.librus_oceny
+  - entity: sensor.librus_jan_maat_oceny
     name: "Liczba ocen"
-  - entity: sensor.librus_szczesliwy_numerek
+  - entity: sensor.librus_jan_maat_szczesliwy_numerek
     name: "Szczęśliwy numerek"
 ```
 
@@ -290,14 +300,14 @@ zamazano.
    Bez tego karty `custom:mushroom-*` pokażą *„Custom element doesn't exist"*.
 2. **Sprawdź nazwę swojej encji** — Narzędzia deweloperskie → Stany, wpisz
    `plan_lekcji`. Encje biorą nazwę od imienia i nazwiska ucznia, np.
-   `sensor.librus_jan_kowalski_plan_lekcji`.
+   `sensor.librus_jan_maat_plan_lekcji`.
 3. **Utwórz dashboard** — Ustawienia → Dashboardy → Dodaj dashboard →
    Nowy dashboard od zera.
 4. **Wklej konfigurację** — otwórz nowy dashboard, menu ⋮ → Edytuj, potem
    ponownie ⋮ → **Edytor nieprzetworzonej konfiguracji**. Wklej całą zawartość
    pliku.
 5. **Podmień encję** — zamień w całym wklejonym tekście
-   `sensor.librus_imie_nazwisko` na swoją nazwę z kroku 2. Zapisz.
+   `sensor.librus_jan_maat` na swoją nazwę z kroku 2. Zapisz.
 
 > **Uwaga o układzie:** karty są opakowane w jeden `vertical-stack`, żeby
 > wymusić jedną kolumnę. `max_columns: 1` **nie zadziała** — domyślny widok
@@ -320,7 +330,7 @@ cards:
   - type: custom:mushroom-title-card
     title: 📅 Nadchodzące wydarzenia
     subtitle: >-
-      {% set z = state_attr('sensor.librus_imie_nazwisko_terminarz', 'zdarzenia') or [] %}
+      {% set z = state_attr('sensor.librus_jan_maat_terminarz', 'zdarzenia') or [] %}
       {% set do = (now() + timedelta(days=28)).strftime('%Y-%m-%d') %}
       {% set n = z | selectattr('data', 'le', do) | list | count %}
       {% set r = n % 10 %}{% set s = n % 100 %}
@@ -330,7 +340,7 @@ cards:
 
   - type: markdown
     content: |-
-      {%- set wszystkie = state_attr('sensor.librus_imie_nazwisko_terminarz', 'zdarzenia') or [] %}
+      {%- set wszystkie = state_attr('sensor.librus_jan_maat_terminarz', 'zdarzenia') or [] %}
       {%- set do = (now() + timedelta(days=28)).strftime('%Y-%m-%d') %}
       {%- set zdarzenia = wszystkie | selectattr('data', 'le', do) | list %}
       {%- set testy = ['sprawdzian', 'kartkówka', 'klasówka', 'praca klasowa'] %}
@@ -358,7 +368,7 @@ tak samo jak w planie lekcji. Horyzont skrócisz podmieniając `days=28` — zwi
 type: markdown
 title: 📅 Terminarz
 content: >
-  {% set zdarzenia = state_attr('sensor.librus_imie_nazwisko_terminarz',
+  {% set zdarzenia = state_attr('sensor.librus_jan_maat_terminarz',
   'zdarzenia') %} {% if zdarzenia %} | Data | Dzień | Typ | Przedmiot | Opis |
    |------|-------|-----|-----------|------|
   {% for z in zdarzenia %} | **{{ z.data }}** | {{ z.tydzien }} | {{ z.tytul }}
@@ -374,7 +384,7 @@ content: >
 type: markdown
 title: 📝 Sprawdziany i klasówki
 content: >
-  {% set zdarzenia = state_attr('sensor.librus_imie_nazwisko_terminarz',
+  {% set zdarzenia = state_attr('sensor.librus_jan_maat_terminarz',
   'zdarzenia') %} {% set typy_testow = ['Sprawdzian', 'Kartkówka', 'Klasówka',
   'Praca klasowa'] %} {% set sprawdziany = zdarzenia | selectattr('tytul', 'in',
   typy_testow) | list %} {% if sprawdziany %} | Data | Dzień | Typ | Przedmiot |
@@ -398,7 +408,7 @@ cards:
   - type: custom:mushroom-title-card
     title: 📚 Plan lekcji
     subtitle: >-
-      {% set p = 'sensor.librus_imie_nazwisko_plan_lekcji' %}
+      {% set p = 'sensor.librus_jan_maat_plan_lekcji' %}
       {% set dt = state_attr(p, 'biezacy_dzien_data') %}
       {% set tydzien = state_attr(p, 'tydzien') %}
       {% set d = tydzien[dt] if dt in tydzien else [] %}
@@ -409,14 +419,14 @@ cards:
 
   - type: custom:mushroom-template-card
     primary: >-
-      {% set s = 'sensor.librus_imie_nazwisko_nastepna_lekcja' %}
+      {% set s = 'sensor.librus_jan_maat_nastepna_lekcja' %}
       {% if states(s) in ['unknown', 'unavailable', 'None'] %}
         Brak zaplanowanych lekcji
       {% else %}
         {{ states(s) }}
       {% endif %}
     secondary: >-
-      {% set s = 'sensor.librus_imie_nazwisko_nastepna_lekcja' %}
+      {% set s = 'sensor.librus_jan_maat_nastepna_lekcja' %}
       {% if states(s) in ['unknown', 'unavailable', 'None'] %}
         —
       {% elif state_attr(s, 'trwa_teraz') %}
@@ -428,17 +438,17 @@ cards:
         za {{ state_attr(s, 'za_minut') }} min
       {% endif %}
     icon: >-
-      {% set s = 'sensor.librus_imie_nazwisko_nastepna_lekcja' %}
+      {% set s = 'sensor.librus_jan_maat_nastepna_lekcja' %}
       {% if state_attr(s, 'trwa_teraz') %}mdi:school
       {% elif state_attr(s, 'data') != now().strftime('%Y-%m-%d') %}mdi:calendar-clock
       {% else %}mdi:clock-start{% endif %}
     icon_color: >-
-      {% set s = 'sensor.librus_imie_nazwisko_nastepna_lekcja' %}
+      {% set s = 'sensor.librus_jan_maat_nastepna_lekcja' %}
       {% if state_attr(s, 'zastepstwo') %}orange
       {% elif state_attr(s, 'trwa_teraz') %}green
       {% else %}blue{% endif %}
     badge_icon: >-
-      {% if state_attr('sensor.librus_imie_nazwisko_nastepna_lekcja', 'zastepstwo') %}
+      {% if state_attr('sensor.librus_jan_maat_nastepna_lekcja', 'zastepstwo') %}
         mdi:account-switch
       {% endif %}
     badge_color: orange
@@ -446,21 +456,21 @@ cards:
   - type: conditional
     conditions:
       - condition: state
-        entity: sensor.librus_imie_nazwisko_plan_lekcji
+        entity: sensor.librus_jan_maat_plan_lekcji
         attribute: sa_zmiany
         state: true
     card:
       type: custom:mushroom-template-card
       primary: Zmiany w planie
       secondary: >-
-        {% set z = state_attr('sensor.librus_imie_nazwisko_plan_lekcji', 'zmiany') %}
+        {% set z = state_attr('sensor.librus_jan_maat_plan_lekcji', 'zmiany') %}
         {{ z | count }} zmian w najbliższym tygodniu
       icon: mdi:calendar-alert
       icon_color: orange
 
   - type: markdown
     content: |-
-      {%- set p = 'sensor.librus_imie_nazwisko_plan_lekcji' %}
+      {%- set p = 'sensor.librus_jan_maat_plan_lekcji' %}
       {%- set d = state_attr(p, 'biezacy_dzien_data') %}
       {%- set tydzien = state_attr(p, 'tydzien') %}
       {%- set lekcje = tydzien[d] if d in tydzien else [] %}
@@ -510,7 +520,7 @@ Legenda:
 type: markdown
 title: 🗓️ Plan tygodnia
 content: |-
-  {%- set p = 'sensor.librus_imie_nazwisko_plan_lekcji' %}
+  {%- set p = 'sensor.librus_jan_maat_plan_lekcji' %}
   {%- set tydzien = state_attr(p, 'tydzien') %}
   {%- set wd = state_attr(p, 'wydarzenia_dnia') %}
   {%- set zd = state_attr(p, 'zadania_dnia') %}
@@ -559,7 +569,7 @@ i `zadania_dnia` (słowniki `data → lista`).
 ### Wykres średniej z przedmiotu (Gauge)
 ```yaml
 type: gauge
-entity: sensor.librus_srednia_matematyka
+entity: sensor.librus_jan_maat_srednia_matematyka
 name: "Matematyka - średnia"
 min: 1
 max: 6
@@ -574,11 +584,11 @@ severity:
 Integracja wysyła zdarzenia Home Assistant gdy pojawi się nowa wiadomość lub ocena.
 Zdarzenia są wykrywane przy każdym odświeżeniu (co 2h). Pierwsze uruchomienie tylko zapamiętuje stan — **nie wysyła duplikatów**.
 
-> **Test bez czekania:** Idź do **Developer Tools → Events**, Event type: `librus_apix_nowa_wiadomosc`, Event data jak poniżej i kliknij **Fire Event**.
+> **Test bez czekania:** Idź do **Developer Tools → Events**, Event type: `librus_nowa_wiadomosc`, Event data jak poniżej i kliknij **Fire Event**.
 
 ### 📬 Powiadomienie o nowej wiadomości
 
-Zdarzenie: `librus_apix_nowa_wiadomosc`  
+Zdarzenie: `librus_nowa_wiadomosc`  
 Dostępne dane: `nadawca`, `temat`, `data`, `ma_zalacznik`
 
 > **Uwaga:** Treść wiadomości nie jest pobierana celowo — aby nie oznaczać wiadomości jako przeczytanych w Librusie.
@@ -588,23 +598,23 @@ automation:
   - alias: "Librus - nowa wiadomosc"
     trigger:
       - platform: event
-        event_type: librus_apix_nowa_wiadomosc
+        event_type: librus_nowa_wiadomosc
     action:
       - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
         data:
           title: "📬 Librus: nowa wiadomość"
           message: >-
-            {% set msg = state_attr('sensor.librus_IMIE_NAZWISKO_wiadomosci', 'wiadomosci')
+            {% set msg = state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')
                | selectattr('nieprzeczytana', 'equalto', true) | list | first | default({}) %}
             Od: {{ msg.nadawca | default('nieznany') }}
             Temat: {{ msg.temat | default('brak') }}
 ```
 
-> **Uwaga:** Zamień `sensor.librus_IMIE_NAZWISKO_wiadomosci` na nazwę swojego sensora widoczną w Developer Tools → States.
+> **Uwaga:** Zamień `sensor.librus_jan_maat_wiadomosci` na nazwę swojego sensora widoczną w Developer Tools → States.
 
 ### 📝 Powiadomienie o nowej ocenie
 
-Zdarzenie: `librus_apix_nowa_ocena`  
+Zdarzenie: `librus_nowa_ocena`  
 Dostępne dane: `przedmiot`, `ocena`, `data`, `kategoria`, `nauczyciel`
 
 ```yaml
@@ -612,7 +622,7 @@ automation:
   - alias: "Librus - nowa ocena"
     trigger:
       platform: event
-      event_type: librus_apix_nowa_ocena
+      event_type: librus_nowa_ocena
     action:
       - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
         data:
@@ -628,7 +638,7 @@ automation:
 
 ### 🔀 Powiadomienie o zastępstwie lub odwołanej lekcji
 
-Zdarzenie: `librus_apix_zmiana_planu`
+Zdarzenie: `librus_zmiana_planu`
 Dostępne dane: `data`, `dzien_tygodnia`, `numer`, `przedmiot`, `od`, `do`, `rodzaj` (`zastepstwo` / `odwolana`), `info`
 
 ```yaml
@@ -636,7 +646,7 @@ automation:
   - alias: "Librus - zmiana w planie lekcji"
     trigger:
       platform: event
-      event_type: librus_apix_zmiana_planu
+      event_type: librus_zmiana_planu
     action:
       - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
         data:
@@ -684,15 +694,15 @@ python -m pytest -q
 Release jest wykonywany przez GitHub Actions. Po przygotowaniu i zmergowaniu
 zmian do `main`:
 
-1. ustaw wersję w `custom_components/librus_apix/manifest.json`,
+1. ustaw wersję w `custom_components/librus/manifest.json`,
 2. otwórz **Actions → Release → Run workflow**,
 3. wybierz gałąź `main`,
-4. wpisz wersję, np. `1.6.0`,
+4. wpisz wersję, np. `1.1.0`,
 5. uruchom workflow.
 
 Workflow sprawdza zgodność podanej wersji z `manifest.json`, uruchamia testy,
 Ruff, `compileall`, hassfest i HACS validate. Dopiero po ich powodzeniu tworzy
-tag o nazwie wersji (np. `1.6.0`) i publikuje GitHub Release z automatycznie
+tag o nazwie wersji (np. `1.1.0`) i publikuje GitHub Release z automatycznie
 wygenerowanymi release notes.
 
 Tagu **nie trzeba tworzyć ręcznie**.
@@ -704,7 +714,7 @@ Aby włączyć szczegółowe logi, dodaj do `configuration.yaml`:
 ```yaml
 logger:
   logs:
-    custom_components.librus_apix: debug
+    custom_components.librus: debug
 ```
 
 ## ⚠️ Bezpieczeństwo
@@ -717,7 +727,7 @@ logger:
 
 ## 🔎 Diagnostyka
 
-W **Ustawienia → Urządzenia i usługi → Librus Synergia HA** można pobrać
+W **Ustawienia → Urządzenia i usługi → Librus Synergia** można pobrać
 diagnostykę wpisu integracji. Plik zawiera status coordinatora, dostępność
 poszczególnych źródeł i liczniki danych, ale nie zawiera loginu, hasła,
 nazwiska ucznia ani treści wiadomości.
@@ -745,7 +755,7 @@ nazwiska ucznia ani treści wiadomości.
 
 ## 🗑️ Usuwanie integracji
 
-1. Otwórz **Ustawienia → Urządzenia i usługi → Librus Synergia HA**.
+1. Otwórz **Ustawienia → Urządzenia i usługi → Librus Synergia**.
 2. Otwórz menu wpisu integracji i wybierz **Usuń**.
 3. Jeśli integracja została zainstalowana przez HACS i nie będzie już używana,
    można ją następnie odinstalować również z HACS.

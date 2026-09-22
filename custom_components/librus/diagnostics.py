@@ -1,4 +1,4 @@
-"""Diagnostics support for the Librus APIX integration."""
+"""Diagnostics support for the Librus Synergia integration."""
 
 from typing import Any
 
