@@ -8,7 +8,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
+from .coordinator import (
+    SOURCE_TIMETABLE,
+    LibrusConfigEntry,
+    LibrusDataUpdateCoordinator,
+)
 from .entity import LibrusEntity
 
 PARALLEL_UPDATES = 0
@@ -38,7 +42,7 @@ def _lesson_summary(lesson: Dict[str, Any]) -> str:
 
 
 def _lesson_description(lesson: Dict[str, Any]) -> Optional[str]:
-    """Zbuduj opis wydarzenia kalendarza."""
+    """Build a useful calendar description from timetable data only."""
     parts: List[str] = []
 
     number = lesson.get("numer")
@@ -49,7 +53,21 @@ def _lesson_description(lesson: Dict[str, Any]) -> Optional[str]:
     if info:
         parts.append(info)
 
-    return "\n".join(parts) or None
+    details = lesson.get("szczegoly") or {}
+    for _change_name, change_details in details.items():
+        if not isinstance(change_details, dict):
+            continue
+        for key, label in (
+            ("teacher_swap", "Nauczyciel"),
+            ("subject_swap", "Przedmiot"),
+            ("classroom_swap", "Sala"),
+            ("date_added", "Dodano"),
+        ):
+            value = change_details.get(key)
+            if value:
+                parts.append(f"{label}: {value}")
+
+    return "\n".join(dict.fromkeys(parts)) or None
 
 
 def _lesson_to_event(lesson: Dict[str, Any]) -> Optional[CalendarEvent]:
@@ -66,6 +84,7 @@ def _lesson_to_event(lesson: Dict[str, Any]) -> Optional[CalendarEvent]:
         summary=_lesson_summary(lesson),
         description=_lesson_description(lesson),
         location=(lesson.get("nauczyciel_sala") or "").strip() or None,
+        uid=f'{lesson.get("data", "")}-{lesson.get("numer", "")}',
     )
 
 
@@ -82,6 +101,7 @@ async def async_setup_entry(
 class LibrusPlanLekcjiCalendar(LibrusEntity, CalendarEntity):
     """Kalendarz planu lekcji z danych pobranych przez wspolny coordinator."""
 
+    _required_sources = frozenset({SOURCE_TIMETABLE})
     _availability_key = "timetable"
 
     def __init__(

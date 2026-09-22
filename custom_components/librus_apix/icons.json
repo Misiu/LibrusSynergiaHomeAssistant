@@ -37,7 +37,7 @@
     },
     "calendar": {
       "lesson_timetable": {
-        "default": "mdi:calendar-school"
+        "default": "mdi:calendar-clock"
       }
     }
   }

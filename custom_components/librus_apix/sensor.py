@@ -10,7 +10,16 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import DEFAULT_PLAN_DAYS
-from .coordinator import LibrusConfigEntry, LibrusDataUpdateCoordinator
+from .coordinator import (
+    SOURCE_GRADES,
+    SOURCE_HOMEWORK,
+    SOURCE_MESSAGES,
+    SOURCE_SCHEDULE,
+    SOURCE_STUDENT_INFO,
+    SOURCE_TIMETABLE,
+    LibrusConfigEntry,
+    LibrusDataUpdateCoordinator,
+)
 from .entity import LibrusEntity
 from .plan_lekcji import (
     biezacy_dzien,
@@ -106,6 +115,8 @@ def _lekcja_do_atrybutu(lekcja: Dict[str, Any]) -> Dict[str, Any]:
 
 class LibrusUczenSensor(LibrusEntity, SensorEntity):
     """Czujnik z informacjami o uczniu."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_STUDENT_INFO})
 
     _availability_key = "student_info"
 
@@ -136,6 +147,8 @@ class LibrusUczenSensor(LibrusEntity, SensorEntity):
 
 class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
     """Czujnik ze szczesliwym numerkiem dnia."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_STUDENT_INFO})
 
     _availability_key = "student_info"
 
@@ -153,6 +166,7 @@ class LibrusSzczesliwyNumerekSensor(LibrusEntity, SensorEntity):
 
 class LibrusOcenySensor(LibrusEntity, SensorEntity):
     """Czujnik z wszystkimi ocenami pogrupowanymi wedlug przedmiotow."""
+    _required_sources = frozenset({SOURCE_GRADES})
 
     _availability_key = "grades"
 
@@ -186,6 +200,8 @@ class LibrusOcenySensor(LibrusEntity, SensorEntity):
 
 class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
     """Czujnik z ocenami dla konkretnego przedmiotu."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_GRADES})
 
     _availability_key = "grades"
 
@@ -243,6 +259,8 @@ class LibrusPrzedmiotSensor(LibrusEntity, SensorEntity):
 
 class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia wszystkich ocen biezacego semestru (do wykresu)."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_GRADES})
 
     _availability_key = "grades"
 
@@ -280,6 +298,8 @@ class LibrusSredniaOcenSensor(LibrusEntity, SensorEntity):
 
 class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
     """Czujnik ze srednia ocen dla konkretnego przedmiotu (do wykresu)."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_GRADES})
 
     _availability_key = "grades"
 
@@ -316,6 +336,8 @@ class LibrusSredniaPrzedmiotuSensor(LibrusEntity, SensorEntity):
 
 class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zdarzeniami z kalendarza Librusa (biezacy + nastepny miesiac)."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_SCHEDULE})
 
     _availability_key = "schedule"
 
@@ -345,6 +367,8 @@ class LibrusTerminarzSensor(LibrusEntity, SensorEntity):
 
 class LibrusZadaniaSensor(LibrusEntity, SensorEntity):
     """Czujnik z nadchodzacymi zadaniami i sprawdzianami (30 dni do przodu)."""
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_HOMEWORK})
 
     _availability_key = "homework"
 
@@ -399,7 +423,10 @@ class _OdswiezanieCominutowe:
 
 
 class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
-    """Czujnik z planem lekcji (biezacy i nastepny tydzien)."""
+    """Legacy timetable sensor kept for backwards compatibility."""
+
+    _attr_entity_registry_enabled_default = False
+    _required_sources = frozenset({SOURCE_TIMETABLE, SOURCE_SCHEDULE, SOURCE_HOMEWORK})
 
     _availability_key = "timetable"
 
@@ -468,6 +495,7 @@ class LibrusPlanLekcjiSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity)
 
 class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEntity):
     """Czujnik z trwajaca lub najblizsza lekcja."""
+    _required_sources = frozenset({SOURCE_TIMETABLE})
 
     _availability_key = "timetable"
 
@@ -507,6 +535,7 @@ class LibrusNastepnaLekcjaSensor(_OdswiezanieCominutowe, LibrusEntity, SensorEnt
 
 class LibrusWiadomosciSensor(LibrusEntity, SensorEntity):
     """Czujnik z wiadomosciami (temat i nadawca, bez pobierania tresci)."""
+    _required_sources = frozenset({SOURCE_MESSAGES})
 
     _availability_key = "messages"
 

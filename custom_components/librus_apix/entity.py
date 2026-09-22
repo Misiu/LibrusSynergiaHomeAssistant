@@ -12,6 +12,7 @@ class LibrusEntity(CoordinatorEntity[LibrusDataUpdateCoordinator]):
 
     _attr_has_entity_name = True
     _availability_key: str | None = None
+    _required_sources: frozenset[str] = frozenset()
 
     def __init__(
         self,
@@ -19,7 +20,7 @@ class LibrusEntity(CoordinatorEntity[LibrusDataUpdateCoordinator]):
         config_entry: LibrusConfigEntry,
     ) -> None:
         """Initialize a Librus entity."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, context=self._required_sources)
         student_info = coordinator.data["student_info"]
         student_name = student_info.name if student_info else "Librus"
         self._attr_device_info = DeviceInfo(

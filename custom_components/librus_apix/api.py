@@ -110,14 +110,53 @@ class LibrusApiClient:
         if result is None:
             return None
 
-        numeric_grades, _average_grades, descriptive_grades = result
+        numeric_grades, average_grades, descriptive_grades = result
         current_semester = _current_semester()
         grades: list[dict[str, Any]] = []
+
+        def _bucket_summary(buckets: Any) -> list[dict[str, int]]:
+            """Return compact parser diagnostics without logging grade details."""
+            summary: list[dict[str, int]] = []
+            for bucket in buckets or []:
+                if not hasattr(bucket, "values"):
+                    summary.append({"subjects": 0, "items": 0})
+                    continue
+                values = list(bucket.values())
+                summary.append(
+                    {
+                        "subjects": len(bucket),
+                        "items": sum(len(items) for items in values),
+                    }
+                )
+            return summary
+
+        _LOGGER.debug(
+            "Librus grades parser result: current_semester=%s, "
+            "numeric=%s, descriptive=%s, average_subjects=%s",
+            current_semester,
+            _bucket_summary(numeric_grades),
+            _bucket_summary(descriptive_grades),
+            len(average_grades or {}),
+        )
 
         for subject_grades in numeric_grades:
             for subject, subject_items in subject_grades.items():
                 for grade in subject_items:
+                    _LOGGER.debug(
+                        "Librus numeric grade parsed: subject=%r, class=%s, "
+                        "grade=%r, semester=%r, date=%r",
+                        subject,
+                        type(grade).__name__,
+                        getattr(grade, "grade", None),
+                        getattr(grade, "semester", None),
+                        getattr(grade, "date", None),
+                    )
                     if grade.semester != current_semester:
+                        _LOGGER.debug(
+                            "Skipping numeric grade because semester %r != %r",
+                            grade.semester,
+                            current_semester,
+                        )
                         continue
                     grades.append(
                         {
@@ -134,10 +173,32 @@ class LibrusApiClient:
         for subject_grades in descriptive_grades:
             for subject, subject_items in subject_grades.items():
                 for grade in subject_items:
+                    _LOGGER.debug(
+                        "Librus descriptive grade parsed: subject=%r, class=%s, "
+                        "grade=%r, semester=%r, date=%r, desc=%r",
+                        subject,
+                        type(grade).__name__,
+                        getattr(grade, "grade", None),
+                        getattr(grade, "semester", None),
+                        getattr(grade, "date", None),
+                        getattr(grade, "desc", None),
+                    )
                     if grade.semester != current_semester:
+                        _LOGGER.debug(
+                            "Skipping descriptive grade because semester %r != %r",
+                            grade.semester,
+                            current_semester,
+                        )
                         continue
                     grade_value = grade.grade.strip()
-                    if not grade_value or not grade_value.replace("+", "").replace("-", "").isdigit():
+                    if (
+                        not grade_value
+                        or not grade_value.replace("+", "").replace("-", "").isdigit()
+                    ):
+                        _LOGGER.debug(
+                            "Skipping descriptive grade with non-numeric value %r",
+                            grade.grade,
+                        )
                         continue
                     grades.append(
                         {
@@ -155,6 +216,10 @@ class LibrusApiClient:
                         }
                     )
 
+        _LOGGER.debug(
+            "Librus grades mapped to Home Assistant: %d item(s)",
+            len(grades),
+        )
         return grades
 
     async def async_get_messages(
