@@ -19,6 +19,8 @@ from custom_components.librus_apix.coordinator import (
     EVENT_NOWE_ZADANIE,
     EVENT_NOWE_ZDARZENIE,
     EVENT_ZMIANA_PLANU,
+    ALL_SOURCES,
+    SOURCE_TIMETABLE,
     LibrusDataUpdateCoordinator,
     _current_semester,
     _jest_nowa,
@@ -226,6 +228,9 @@ async def test_partial_source_availability_logs_only_transitions(
     coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
 
     client.async_get_messages.return_value = None
+    unsubscribe = coordinator.async_add_listener(
+        lambda: None, frozenset(ALL_SOURCES)
+    )
     await coordinator._async_update_data()
     await coordinator._async_update_data()
 
@@ -245,6 +250,7 @@ async def test_partial_source_availability_logs_only_transitions(
         for record in caplog.records
         if record.message == "Librus data source messages is available again"
     ]
+    unsubscribe()
     assert len(recovery_logs) == 1
 
 
@@ -261,6 +267,9 @@ async def test_first_recovery_of_source_does_not_emit_old_events(
     hass.bus.async_listen(EVENT_NOWA_WIADOMOSC, events.append)
 
     await coordinator._async_update_data()
+    unsubscribe = coordinator.async_add_listener(
+        lambda: None, frozenset(ALL_SOURCES)
+    )
 
     client.async_get_messages.return_value = [
         {
@@ -290,6 +299,7 @@ async def test_first_recovery_of_source_does_not_emit_old_events(
     await coordinator._async_update_data()
     await hass.async_block_till_done()
 
+    unsubscribe()
     assert len(events) == 1
     assert events[0].data["temat"] == "New message"
 
@@ -319,6 +329,9 @@ async def test_new_items_fire_all_supported_events(hass: HomeAssistant) -> None:
     coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
 
     await coordinator._async_update_data()
+    unsubscribe = coordinator.async_add_listener(
+        lambda: None, frozenset(ALL_SOURCES)
+    )
 
     received: dict[str, list] = {
         EVENT_NOWA_WIADOMOSC: [],
@@ -397,6 +410,7 @@ async def test_new_items_fire_all_supported_events(hass: HomeAssistant) -> None:
     await coordinator._async_update_data()
     await hass.async_block_till_done()
 
+    unsubscribe()
     assert {event_type: len(events) for event_type, events in received.items()} == {
         EVENT_NOWA_WIADOMOSC: 1,
         EVENT_NOWA_OCENA: 1,
@@ -404,3 +418,231 @@ async def test_new_items_fire_all_supported_events(hass: HomeAssistant) -> None:
         EVENT_NOWE_ZDARZENIE: 1,
         EVENT_ZMIANA_PLANU: 1,
     }
+
+
+
+async def test_after_bootstrap_only_requested_sources_are_polled(
+    hass: HomeAssistant,
+) -> None:
+    """Enabled entity contexts decide which Librus endpoints are refreshed."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    # First refresh bootstraps all sources before platforms exist.
+    await coordinator._async_update_data()
+    for method in (
+        client.async_get_student_information,
+        client.async_get_grades,
+        client.async_get_messages,
+        client.async_get_homework,
+        client.async_get_schedule,
+        client.async_get_timetable,
+    ):
+        method.reset_mock()
+
+    unsubscribe = coordinator.async_add_listener(
+        lambda: None, frozenset({SOURCE_TIMETABLE})
+    )
+    try:
+        await coordinator._async_update_data()
+    finally:
+        unsubscribe()
+
+    client.async_get_timetable.assert_awaited_once()
+    client.async_get_student_information.assert_not_awaited()
+    client.async_get_grades.assert_not_awaited()
+    client.async_get_messages.assert_not_awaited()
+    client.async_get_homework.assert_not_awaited()
+    client.async_get_schedule.assert_not_awaited()
+
+
+async def test_no_enabled_entity_contexts_make_no_api_requests(
+    hass: HomeAssistant,
+) -> None:
+    """After bootstrap, disabling every entity avoids all polling requests."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    await coordinator._async_update_data()
+    for method in (
+        client.async_get_student_information,
+        client.async_get_grades,
+        client.async_get_messages,
+        client.async_get_homework,
+        client.async_get_schedule,
+        client.async_get_timetable,
+    ):
+        method.reset_mock()
+
+    result = await coordinator._async_update_data()
+
+    assert result["plan_lekcji"] == []
+    client.async_get_student_information.assert_not_awaited()
+    client.async_get_grades.assert_not_awaited()
+    client.async_get_messages.assert_not_awaited()
+    client.async_get_homework.assert_not_awaited()
+    client.async_get_schedule.assert_not_awaited()
+    client.async_get_timetable.assert_not_awaited()
+
+
+async def test_context_matrix_calendar_only_polls_only_timetable(
+    hass: HomeAssistant,
+) -> None:
+    """Calendar-only context polls only the timetable after bootstrap."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    await coordinator._async_update_data()
+    for method in (
+        client.async_get_student_information,
+        client.async_get_grades,
+        client.async_get_messages,
+        client.async_get_homework,
+        client.async_get_schedule,
+        client.async_get_timetable,
+    ):
+        method.reset_mock()
+
+    unsubscribe = coordinator.async_add_listener(
+        lambda: None, frozenset({SOURCE_TIMETABLE})
+    )
+    try:
+        await coordinator._async_update_data()
+    finally:
+        unsubscribe()
+
+    client.async_get_timetable.assert_awaited_once()
+    client.async_get_student_information.assert_not_awaited()
+    client.async_get_grades.assert_not_awaited()
+    client.async_get_messages.assert_not_awaited()
+    client.async_get_homework.assert_not_awaited()
+    client.async_get_schedule.assert_not_awaited()
+
+
+async def test_context_matrix_calendar_plus_grades_polls_two_sources(
+    hass: HomeAssistant,
+) -> None:
+    """Calendar plus grades polls exactly timetable and grades."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    await coordinator._async_update_data()
+    for method in (
+        client.async_get_student_information,
+        client.async_get_grades,
+        client.async_get_messages,
+        client.async_get_homework,
+        client.async_get_schedule,
+        client.async_get_timetable,
+    ):
+        method.reset_mock()
+
+    unsub_calendar = coordinator.async_add_listener(
+        lambda: None, frozenset({SOURCE_TIMETABLE})
+    )
+    unsub_grades = coordinator.async_add_listener(
+        lambda: None, frozenset({"grades"})
+    )
+    try:
+        await coordinator._async_update_data()
+    finally:
+        unsub_grades()
+        unsub_calendar()
+
+    client.async_get_timetable.assert_awaited_once()
+    client.async_get_grades.assert_awaited_once()
+    client.async_get_student_information.assert_not_awaited()
+    client.async_get_messages.assert_not_awaited()
+    client.async_get_homework.assert_not_awaited()
+    client.async_get_schedule.assert_not_awaited()
+
+
+async def test_context_source_stops_after_entity_context_is_removed(
+    hass: HomeAssistant,
+) -> None:
+    """Removing a context immediately stops polling its source."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+
+    await coordinator._async_update_data()
+    for method in (
+        client.async_get_messages,
+        client.async_get_timetable,
+    ):
+        method.reset_mock()
+
+    unsub_calendar = coordinator.async_add_listener(
+        lambda: None, frozenset({SOURCE_TIMETABLE})
+    )
+    unsub_messages = coordinator.async_add_listener(
+        lambda: None, frozenset({"messages"})
+    )
+
+    await coordinator._async_update_data()
+    client.async_get_timetable.assert_awaited_once()
+    client.async_get_messages.assert_awaited_once()
+
+    client.async_get_timetable.reset_mock()
+    client.async_get_messages.reset_mock()
+    unsub_messages()
+
+    try:
+        await coordinator._async_update_data()
+    finally:
+        unsub_calendar()
+
+    client.async_get_timetable.assert_awaited_once()
+    client.async_get_messages.assert_not_awaited()
+
+
+async def test_reenabled_source_seeds_cache_without_false_events(
+    hass: HomeAssistant,
+) -> None:
+    """Re-enabling a source seeds its current data instead of firing backlog events."""
+    entry = _entry()
+    client = _client()
+    coordinator = LibrusDataUpdateCoordinator(hass, entry, client)
+    received = []
+    hass.bus.async_listen(EVENT_NOWA_WIADOMOSC, received.append)
+
+    await coordinator._async_update_data()
+
+    unsub_messages = coordinator.async_add_listener(
+        lambda: None, frozenset({"messages"})
+    )
+    await coordinator._async_update_data()
+    unsub_messages()
+
+    # One refresh without messages removes the source from initialized sources.
+    unsub_calendar = coordinator.async_add_listener(
+        lambda: None, frozenset({SOURCE_TIMETABLE})
+    )
+    await coordinator._async_update_data()
+
+    client.async_get_messages.return_value = [
+        {
+            "author": "Sekretariat",
+            "title": "Existing while disabled",
+            "date": "2026-09-22",
+            "href": "/message/existing",
+            "unread": True,
+            "has_attachment": False,
+        }
+    ]
+
+    unsub_messages = coordinator.async_add_listener(
+        lambda: None, frozenset({"messages"})
+    )
+    try:
+        await coordinator._async_update_data()
+        await hass.async_block_till_done()
+    finally:
+        unsub_messages()
+        unsub_calendar()
+
+    assert received == []

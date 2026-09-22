@@ -2,16 +2,16 @@
   "domain": "librus_apix",
   "name": "Librus Synergia HA",
   "codeowners": [
-    "@JareckiB12"
+    "@Misiu"
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/JareckiB12/LibrusSynergiaHA",
+  "documentation": "https://github.com/Misiu/LibrusSynergiaHomeAssistant",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/JareckiB12/LibrusSynergiaHA/issues",
+  "issue_tracker": "https://github.com/Misiu/LibrusSynergiaHomeAssistant/issues",
   "requirements": [
     "librus-apix==1.5.2"
   ],
-  "version": "1.4.0"
+  "version": "1.5.0"
 }

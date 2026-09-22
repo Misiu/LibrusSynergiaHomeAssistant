@@ -1,6 +1,7 @@
 """Tests for the Librus API wrapper."""
 
 from datetime import datetime
+import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -102,9 +103,11 @@ async def test_async_call_stops_when_reauthentication_fails() -> None:
 
 async def test_get_grades_filters_semester_and_non_numeric_descriptions(
     freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Grades expose only current-semester numeric values."""
     freezer.move_to("2026-09-21")
+    caplog.set_level(logging.DEBUG, logger="custom_components.librus_apix.api")
     api = _authenticated_client()
     numeric_current = SimpleNamespace(
         semester=1,
@@ -165,6 +168,26 @@ async def test_get_grades_filters_semester_and_non_numeric_descriptions(
             "type": "descriptive",
         },
     ]
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(
+        "numeric=[{'subjects': 1, 'items': 2}]" in message
+        and "descriptive=[{'subjects': 1, 'items': 2}]" in message
+        for message in messages
+    )
+    assert any(
+        "Librus descriptive grade parsed" in message
+        and "grade='4+'" in message
+        for message in messages
+    )
+    assert any(
+        "Skipping descriptive grade with non-numeric value 'bz'" in message
+        for message in messages
+    )
+    assert any(
+        "Librus grades mapped to Home Assistant: 2 item(s)" in message
+        for message in messages
+    )
 
 
 async def test_get_grades_returns_none_on_api_failure() -> None:

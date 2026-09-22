@@ -34,6 +34,13 @@ Sensor `nastepna_lekcja` przelicza swój stan co minutę lokalnie — **bez doda
 
 Sensory średnich mają `state_class: measurement` — HA automatycznie rysuje dla nich wykres historyczny po kliknięciu w encję.
 
+Dla nowych instalacji część opcjonalnych sensorów jest **wyłączona domyślnie**,
+żeby nie wykonywać niepotrzebnych zapytań: Informacje o uczniu, Szczęśliwy
+numerek, Zadania, Średnia ocen, Terminarz oraz legacy sensor Plan lekcji.
+Domyślnie aktywne pozostają cztery główne encje: **Oceny, Wiadomości, Następna
+lekcja oraz natywny kalendarz Plan lekcji**. Każdą z pozostałych encji można
+włączyć w dowolnym momencie w ustawieniach urządzenia/integracji Home Assistant.
+
 ### Natywny kalendarz planu lekcji
 
 Encja `calendar.librus_<uczen>_plan_lekcji` korzysta z tego samego cache co sensory planu — **nie wykonuje dodatkowych zapytań do Librusa**. Home Assistant może pobierać z niej wydarzenia dla dowolnego zakresu znajdującego się w aktualnie pobranych dwóch tygodniach planu.
@@ -52,14 +59,14 @@ To pozwala użyć standardowych kart kalendarza HA albo pobrać najbliższe dni 
 
 Kliknij poniższy przycisk, aby automatycznie dodać repozytorium do HACS z właściwą kategorią:
 
-[![Otwórz w HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=JareckiB12&repository=LibrusSynergiaHA&category=integration)
+[![Otwórz w HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Misiu&repository=LibrusSynergiaHomeAssistant&category=integration)
 
 Lub ręcznie:
 
 1. Otwórz HACS w Home Assistant
 2. Kliknij trzy kropki (⋮) w prawym górnym rogu
 3. Wybierz **"Custom repositories"**
-4. W polu URL wpisz dokładnie: `https://github.com/JareckiB12/LibrusSynergiaHA`  
+4. W polu URL wpisz dokładnie: `https://github.com/Misiu/LibrusSynergiaHomeAssistant`  
    ⚠️ **Bez `.git` na końcu!**
 5. W polu **Category** wybierz: **`Integration`**  
    ⚠️ **NIE wybieraj "AppDaemon", "Plugin" ani żadnej innej opcji!**
@@ -85,19 +92,59 @@ Lub ręcznie:
    - **Hasło**: Twoje hasło do Librus
 4. Kliknij **"Prześlij"**
 
-### Częstotliwość odświeżania
+### Częstotliwość odświeżania i liczba zapytań
 
 Integracja odpytuje Librusa **co 2 godziny**. Interwał jest ustalony przez
 integrację zgodnie z zaleceniami Home Assistanta dla integracji pollingowych
 i nie jest konfigurowany w config flow ani opcjach integracji.
 
-Jedno odświeżenie to **8 zapytań HTTP**: oceny, wiadomości, zadania domowe, dane
-ucznia, terminarz (2 miesiące) i plan lekcji (2 tygodnie). Przy interwale
-2 godzin daje to około 96 zapytań na dobę.
+Po pierwszym uruchomieniu integracja wykonuje pełny **bootstrap** wszystkich
+źródeł. To celowe: pierwszy refresh odbywa się zanim Home Assistant utworzy
+platformy i coordinator pozna konteksty aktywnych encji. Dzięki temu setup
+pozostaje prosty i przewidywalny.
 
-> Czujniki `Plan lekcji` i `Następna lekcja` przeliczają się **co minutę lokalnie**,
-> bez dodatkowych zapytań do Librusa. Dzięki temu odliczanie „za X minut" i
-> przeskok na kolejny dzień działają na bieżąco pomiędzy odświeżeniami danych.
+**Kolejne odświeżenia są context-aware**: coordinator pobiera tylko te źródła
+API, które są wymagane przez aktualnie włączone encje. Wyłączenie nieużywanej
+encji w Home Assistant zmniejsza więc liczbę kolejnych zapytań bez potrzeby
+restartu integracji.
+
+| Encja | Źródło API |
+|---|---|
+| Informacje o uczniu | `student_info` |
+| Szczęśliwy numerek | `student_info` |
+| Oceny | `grades` |
+| Średnia ocen | `grades` |
+| Oceny z przedmiotu | `grades` |
+| Średnia z przedmiotu | `grades` |
+| Wiadomości | `messages` |
+| Zadania | `homework` |
+| Terminarz *(domyślnie wyłączony)* | `schedule` |
+| Następna lekcja | `timetable` |
+| Kalendarz planu lekcji | `timetable` |
+| Legacy sensor planu lekcji *(domyślnie wyłączony)* | `timetable + schedule + homework` |
+
+Przykład: jeżeli po bootstrapie zostawisz aktywny wyłącznie
+`calendar.librus_<uczen>_plan_lekcji`, kolejne refreshe pobierają tylko
+`timetable`. Jeśli włączysz dodatkowo encje ocen, coordinator pobierze
+`timetable + grades`.
+
+Legacy `sensor.librus_<uczen>_plan_lekcji` jest dla nowych instalacji
+**wyłączony domyślnie**. Zalecanym sposobem korzystania z planu jest natywny
+kalendarz Home Assistanta. Sensor legacy pozostaje dostępny ze względu na
+kompatybilność ze starszymi dashboardami.
+
+Ręczne odświeżenie działa przez standardową akcję Home Assistanta i korzysta
+z tego samego context-aware coordinatora:
+
+```yaml
+action: homeassistant.update_entity
+target:
+  entity_id: calendar.librus_imie_nazwisko_plan_lekcji
+```
+
+> `Następna lekcja` oraz legacy `Plan lekcji` przeliczają swój stan
+> **co minutę lokalnie**, bez dodatkowych zapytań do Librusa. Zmiana czasu,
+> trwającej lekcji czy przejście na kolejny dzień nie uruchamia requestu HTTP.
 
 Po dodaniu integracji encje pojawią się w ciągu kilku sekund. Gotowy dashboard
 z planem lekcji wklejasz z pliku
@@ -618,7 +665,7 @@ automation:
 ### Setup środowiska deweloperskiego
 ```bash
 # Klonuj repozytorium
-git clone https://github.com/JareckiB12/LibrusSynergiaHA
+git clone https://github.com/Misiu/LibrusSynergiaHomeAssistant
 cd librus-ha-integration
 
 # Uruchom środowisko testowe
@@ -631,6 +678,24 @@ docker-compose up -d
 ```bash
 python -m pytest -q
 ```
+
+### Wydawanie nowej wersji
+
+Release jest wykonywany przez GitHub Actions. Po przygotowaniu i zmergowaniu
+zmian do `main`:
+
+1. ustaw wersję w `custom_components/librus_apix/manifest.json`,
+2. otwórz **Actions → Release → Run workflow**,
+3. wybierz gałąź `main`,
+4. wpisz wersję, np. `1.6.0`,
+5. uruchom workflow.
+
+Workflow sprawdza zgodność podanej wersji z `manifest.json`, uruchamia testy,
+Ruff, `compileall`, hassfest i HACS validate. Dopiero po ich powodzeniu tworzy
+tag o nazwie wersji (np. `1.6.0`) i publikuje GitHub Release z automatycznie
+wygenerowanymi release notes.
+
+Tagu **nie trzeba tworzyć ręcznie**.
 
 ## 📝 Logi
 
@@ -730,7 +795,7 @@ w celach identyfikacyjnych.
 ## 🤝 Wkład
 
 Pull requesty są mile widziane — zgłoś je przez
-[Issues](https://github.com/JareckiB12/LibrusSynergiaHA/issues) lub bezpośrednio
+[Issues](https://github.com/Misiu/LibrusSynergiaHomeAssistant/issues) lub bezpośrednio
 jako PR.
 
 ### 🙏 Podziękowania
@@ -738,6 +803,8 @@ jako PR.
 Specjalne podziękowania dla **KB** za wsparcie i pomoc w rozwoju projektu.
 
 ## 👨‍💻 Autor
+
+**[Misiu](https://github.com/Misiu)**
 
 Stworzono na bazie biblioteki [librus-apix](https://github.com/poroknights/librus-apix)
 

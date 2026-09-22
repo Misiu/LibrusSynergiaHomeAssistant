@@ -24,6 +24,7 @@ def _lekcja(
     zastepstwo=False,
     odwolana=False,
     info="",
+    szczegoly=None,
 ):
     return {
         "data": data,
@@ -36,7 +37,7 @@ def _lekcja(
         "odwolana": odwolana,
         "zastepstwo": zastepstwo,
         "info": info,
-        "szczegoly": {},
+        "szczegoly": szczegoly or {},
     }
 
 
@@ -49,6 +50,28 @@ def _calendar(plan):
     entry = MagicMock()
     entry.entry_id = "test-entry"
     return LibrusPlanLekcjiCalendar(coordinator, entry)
+
+
+def test_calendar_icon_translation_matches_icons_json() -> None:
+    """Calendar translation key has an icon defined in icons.json."""
+    import json
+    from pathlib import Path
+
+    calendar = _calendar([])
+    icons = json.loads(
+        (
+            Path(__file__).parents[1]
+            / "custom_components"
+            / "librus_apix"
+            / "icons.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert calendar.translation_key == "lesson_timetable"
+    assert (
+        icons["entity"]["calendar"][calendar.translation_key]["default"]
+        == "mdi:calendar-clock"
+    )
 
 
 def test_lesson_to_event_mapuje_pola():
@@ -213,3 +236,36 @@ def test_event_none_gdy_plan_sie_skoczyl(freezer: FrozenDateTimeFactory) -> None
     )
 
     assert calendar.event is None
+
+
+
+def test_lesson_to_event_exposes_substitution_details() -> None:
+    """Timetable change metadata is available without the legacy plan sensor."""
+    event = _lesson_to_event(
+        _lekcja(
+            data="2026-09-22",
+            zastepstwo=True,
+            info="zastępstwo",
+            nauczyciel_sala="Nauczyciel B",
+            szczegoly={
+                "zastępstwo": {
+                    "teacher_swap": "Nauczyciel A -> Nauczyciel B",
+                    "subject_swap": "Edukacja wczesnoszkolna",
+                    "classroom_swap": "[brak] -> [brak]",
+                    "date_added": "2026-09-20 nd.",
+                }
+            },
+        )
+    )
+
+    assert event is not None
+    assert event.location == "Nauczyciel B"
+    assert event.uid == "2026-09-22-1"
+    assert event.description == (
+        "Lekcja 1\n"
+        "zastępstwo\n"
+        "Nauczyciel: Nauczyciel A -> Nauczyciel B\n"
+        "Przedmiot: Edukacja wczesnoszkolna\n"
+        "Sala: [brak] -> [brak]\n"
+        "Dodano: 2026-09-20 nd."
+    )

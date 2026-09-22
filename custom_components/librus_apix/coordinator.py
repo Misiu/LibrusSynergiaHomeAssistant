@@ -68,6 +68,23 @@ type LibrusConfigEntry = ConfigEntry[LibrusDataUpdateCoordinator]
 
 UPDATE_INTERVAL = timedelta(hours=2)
 
+SOURCE_STUDENT_INFO = "student_info"
+SOURCE_GRADES = "grades"
+SOURCE_MESSAGES = "messages"
+SOURCE_HOMEWORK = "homework"
+SOURCE_SCHEDULE = "schedule"
+SOURCE_TIMETABLE = "timetable"
+ALL_SOURCES = frozenset(
+    {
+        SOURCE_STUDENT_INFO,
+        SOURCE_GRADES,
+        SOURCE_MESSAGES,
+        SOURCE_HOMEWORK,
+        SOURCE_SCHEDULE,
+        SOURCE_TIMETABLE,
+    }
+)
+
 
 class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
     """Klasa zarzadzajaca pobieraniem danych z Librus."""
@@ -87,6 +104,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
         self._seen_plan_ids: set = set()
         self._unavailable_sources: set[str] = set()
         self._initialized_sources: set[str] = set()
+        self._bootstrap_complete = False
         super().__init__(
             hass,
             _LOGGER,
@@ -95,91 +113,121 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
             update_interval=UPDATE_INTERVAL,
         )
 
+    def _requested_sources(self) -> set[str]:
+        """Return sources needed by currently enabled coordinator entities."""
+        if not self._bootstrap_complete:
+            # The first refresh happens before platforms are forwarded, so there are
+            # no entity contexts yet. Bootstrap all sources once to create the device
+            # and dynamic subject entities. Later refreshes follow enabled entities.
+            return set(ALL_SOURCES)
+
+        requested: set[str] = set()
+        for context in self.async_contexts():
+            if isinstance(context, (set, frozenset)):
+                requested.update(context)
+            elif isinstance(context, str):
+                requested.add(context)
+        return requested
+
     async def _async_update_data(self) -> LibrusCoordinatorData:
-        """Pobierz aktualne dane z API Librus."""
+        """Fetch only Librus data needed by enabled entities."""
         current_sem = _current_semester()
+        prev = self.data or {}
+        requested = self._requested_sources()
+
+        if not requested:
+            return {
+                "student_info": prev.get("student_info"),
+                "oceny": prev.get("oceny", []),
+                "oceny_wg_przedmiotu": prev.get("oceny_wg_przedmiotu", {}),
+                "wiadomosci": prev.get("wiadomosci", []),
+                "zadania": prev.get("zadania", []),
+                "terminarz": prev.get("terminarz", []),
+                "plan_lekcji": prev.get("plan_lekcji", []),
+                "semestr_biezacy": current_sem,
+                "availability": prev.get("availability", {}),
+            }
+
+        availability = dict(prev.get("availability", {}))
+        successful_source = False
 
         try:
-            student_info = await self.client.async_get_student_information()
-            self._raise_if_auth_failed()
+            student_info = prev.get("student_info")
+            if SOURCE_STUDENT_INFO in requested:
+                fetched = await self.client.async_get_student_information()
+                self._raise_if_auth_failed()
+                availability[SOURCE_STUDENT_INFO] = fetched is not None
+                if fetched is not None:
+                    student_info = fetched
+                    successful_source = True
 
-            grades = await self.client.async_get_grades()
-            self._raise_if_auth_failed()
+            grades = prev.get("oceny", [])
+            oceny_wg_przedmiotu = prev.get("oceny_wg_przedmiotu", {})
+            if SOURCE_GRADES in requested:
+                fetched_grades = await self.client.async_get_grades()
+                self._raise_if_auth_failed()
+                availability[SOURCE_GRADES] = fetched_grades is not None
+                if fetched_grades is not None:
+                    successful_source = True
+                    grades = fetched_grades
+                    oceny_wg_przedmiotu = {}
+                    for grade in grades:
+                        subject = grade["subject"]
+                        oceny_wg_przedmiotu.setdefault(subject, []).append(
+                            {
+                                "ocena": grade["grade"],
+                                "data": grade["date"],
+                                "kategoria": grade["category"],
+                                "nauczyciel": grade["teacher"],
+                                "semestr": grade.get("semester"),
+                                "jest_nowa": _jest_nowa(grade["date"]),
+                            }
+                        )
 
-            messages = await self.client.async_get_messages(count=10)
-            self._raise_if_auth_failed()
+            wiadomosci = prev.get("wiadomosci", [])
+            if SOURCE_MESSAGES in requested:
+                messages = await self.client.async_get_messages(count=10)
+                self._raise_if_auth_failed()
+                availability[SOURCE_MESSAGES] = messages is not None
+                if messages is not None:
+                    successful_source = True
+                    wiadomosci = self._build_wiadomosci(messages)
 
-            homework_raw = await self.client.async_get_homework()
-            self._raise_if_auth_failed()
+            zadania = prev.get("zadania", [])
+            if SOURCE_HOMEWORK in requested:
+                homework_raw = await self.client.async_get_homework()
+                self._raise_if_auth_failed()
+                availability[SOURCE_HOMEWORK] = homework_raw is not None
+                if homework_raw is not None:
+                    successful_source = True
+                    zadania = self._build_zadania(homework_raw)
 
-            schedule_raw = await self.client.async_get_schedule()
-            self._raise_if_auth_failed()
+            terminarz = prev.get("terminarz", [])
+            if SOURCE_SCHEDULE in requested:
+                schedule_raw = await self.client.async_get_schedule()
+                self._raise_if_auth_failed()
+                availability[SOURCE_SCHEDULE] = schedule_raw is not None
+                if schedule_raw is not None:
+                    successful_source = True
+                    terminarz = schedule_raw
 
-            plan_raw = await self.client.async_get_timetable()
-            self._raise_if_auth_failed()
+            plan_lekcji = prev.get("plan_lekcji", [])
+            if SOURCE_TIMETABLE in requested:
+                plan_raw = await self.client.async_get_timetable()
+                self._raise_if_auth_failed()
+                availability[SOURCE_TIMETABLE] = plan_raw is not None
+                if plan_raw is not None:
+                    successful_source = True
+                    plan_lekcji = plan_raw
 
-            if all(
-                value is None
-                for value in (
-                    student_info,
-                    grades,
-                    messages,
-                    homework_raw,
-                    schedule_raw,
-                    plan_raw,
-                )
-            ):
+            if not successful_source:
                 raise UpdateFailed("Librus API is unavailable")
 
-            availability = {
-                "student_info": student_info is not None,
-                "grades": grades is not None,
-                "messages": messages is not None,
-                "homework": homework_raw is not None,
-                "schedule": schedule_raw is not None,
-                "timetable": plan_raw is not None,
-            }
+            for source in ALL_SOURCES:
+                availability.setdefault(source, True)
             self._log_source_availability(availability)
 
-            prev = self.data or {}
-
-            if grades is None:
-                grades = prev.get("oceny", [])
-                oceny_wg_przedmiotu = prev.get("oceny_wg_przedmiotu", {})
-            else:
-                oceny_wg_przedmiotu: Dict[str, List[Dict]] = {}
-                for grade in grades:
-                    subject = grade["subject"]
-                    if subject not in oceny_wg_przedmiotu:
-                        oceny_wg_przedmiotu[subject] = []
-                    oceny_wg_przedmiotu[subject].append({
-                        "ocena": grade["grade"],
-                        "data": grade["date"],
-                        "kategoria": grade["category"],
-                        "nauczyciel": grade["teacher"],
-                        "semestr": grade.get("semester"),
-                        "jest_nowa": _jest_nowa(grade["date"]),
-                    })
-
-            student_info = student_info or prev.get("student_info")
-            wiadomosci = (
-                self._build_wiadomosci(messages)
-                if messages is not None
-                else prev.get("wiadomosci", [])
-            )
-            zadania = (
-                self._build_zadania(homework_raw)
-                if homework_raw is not None
-                else prev.get("zadania", [])
-            )
-            terminarz = (
-                schedule_raw if schedule_raw is not None else prev.get("terminarz", [])
-            )
-            plan_lekcji = (
-                plan_raw if plan_raw is not None else prev.get("plan_lekcji", [])
-            )
-
-            result = {
+            result: LibrusCoordinatorData = {
                 "student_info": student_info,
                 "oceny": grades,
                 "oceny_wg_przedmiotu": oceny_wg_przedmiotu,
@@ -191,7 +239,11 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
                 "availability": availability,
             }
 
+            # If a source was disabled, do not emit a backlog of custom events
+            # when it is enabled again. Its first successful fetch seeds the cache.
+            self._initialized_sources.intersection_update(requested)
             self._process_events(
+                requested,
                 availability,
                 wiadomosci,
                 grades,
@@ -199,7 +251,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
                 terminarz,
                 plan_lekcji,
             )
-
+            self._bootstrap_complete = True
             return result
 
         except (ConfigEntryAuthFailed, UpdateFailed):
@@ -209,6 +261,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
 
     def _process_events(
         self,
+        requested: set[str],
         availability: dict[str, bool],
         messages: List[Dict],
         grades: List[Dict],
@@ -261,7 +314,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[LibrusCoordinatorData]):
         }
 
         for source, (_data, seed, fire) in sources.items():
-            if not availability[source]:
+            if source not in requested or not availability[source]:
                 continue
             if source not in self._initialized_sources:
                 seed()

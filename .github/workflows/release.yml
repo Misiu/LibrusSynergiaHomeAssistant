@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 1.5.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      commit_sha: ${{ steps.meta.outputs.commit_sha }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - name: Require main branch
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_NAME" != "main" ]]; then
+            echo "Release workflow must be started from the main branch."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.2"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+
+      - name: Validate release version
+        id: meta
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"].strip()
+          if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", version):
+              raise SystemExit(
+                  "Version must be a semantic version without a leading 'v', e.g. 1.6.0"
+              )
+
+          manifest = json.loads(
+              Path("custom_components/librus_apix/manifest.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          manifest_version = str(manifest.get("version", "")).strip()
+          if manifest_version != version:
+              raise SystemExit(
+                  f"manifest.json has version {manifest_version!r}, "
+                  f"but workflow input is {version!r}"
+              )
+          PY
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_VERSION"             >/dev/null 2>&1; then
+            echo "Tag $RELEASE_VERSION already exists."
+            exit 1
+          fi
+
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          version_without_build="${RELEASE_VERSION%%+*}"
+          if [[ "$version_without_build" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install test dependencies
+        run: pip install -r requirements_test.txt
+
+      - name: Ruff check
+        run: ruff check --select E9,F custom_components/librus_apix tests
+
+      - name: Compile integration
+        run: python -m compileall -q custom_components/librus_apix tests
+
+      - name: Run tests
+        run: python -m pytest -q --cov=custom_components/librus_apix --cov-report=term-missing --cov-fail-under=95
+
+      - name: Run hassfest
+        uses: home-assistant/actions/hassfest@master
+
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: integration
+          ignore: license
+
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          COMMIT_SHA: ${{ needs.validate.outputs.commit_sha }}
+          PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          args=(
+            release create "$VERSION"
+            --repo "$REPOSITORY"
+            --target "$COMMIT_SHA"
+            --generate-notes
+            --title "Librus Synergia HA $VERSION"
+          )
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease --latest=false)
+          else
+            args+=(--latest)
+          fi
+
+          gh "${args[@]}"
