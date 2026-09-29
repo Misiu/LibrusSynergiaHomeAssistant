@@ -1,0 +1,86 @@
+# Automatyzacje powiadomień na telefon
+# Kopniij zamień NAZWA_TWOJEGO_TELEFONU na Twoją nazwę urządzenia
+# Znajdź ją w: HA → Settings → Devices & Services → Mobile App
+
+# Powiadomienie o nowej wiadomości
+automation:
+  - alias: "Librus - nowa wiadomosc"
+    trigger:
+      - platform: event
+        event_type: librus_nowa_wiadomosc
+    action:
+      - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
+        data:
+          title: "📬 Librus: nowa wiadomość"
+          message: >
+            {% set msg = state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')
+               | selectattr('nieprzeczytana', 'equalto', true) | list | first | default({}) %}
+            Od: {{ msg.nadawca | default('nieznany') }}
+            Temat: {{ msg.temat | default('brak') }}
+
+---
+
+# Powiadomienie o nowej ocenie
+automation:
+  - alias: "Librus - nowa ocena"
+    trigger:
+      platform: event
+      event_type: librus_nowa_ocena
+    action:
+      - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
+        data:
+          title: "🎓 Librus: nowa ocena {{ trigger.event.data.ocena }}"
+          message: >
+            {{ trigger.event.data.przedmiot }}
+            Ocena: {{ trigger.event.data.ocena }}
+            Kategoria: {{ trigger.event.data.kategoria }}
+            Nauczyciel: {{ trigger.event.data.nauczyciel }}
+
+---
+
+# Powiadomienie o zastępstwie lub odwołanej lekcji
+automation:
+  - alias: "Librus - zmiana w planie lekcji"
+    trigger:
+      platform: event
+      event_type: librus_zmiana_planu
+    action:
+      - service: notify.mobile_app_NAZWA_TWOJEGO_TELEFONU
+        data:
+          title: >
+            {% if trigger.event.data.rodzaj == 'odwolana' %}
+              🚫 Lekcja odwołana
+            {% else %}
+              🔀 Zastępstwo
+            {% endif %}
+          message: >
+            {{ trigger.event.data.dzien_tygodnia }} {{ trigger.event.data.data }},
+            {{ trigger.event.data.numer }}. lekcja ({{ trigger.event.data.od }}):
+            {{ trigger.event.data.przedmiot }}
+
+---
+
+# DOSTĘPNE ZDARZENIA (Event types)
+# 
+# librus_nowa_wiadomosc:
+#   - nadawca (str)
+#   - temat (str)
+#   - data (str)
+#   - ma_zalacznik (bool)
+#
+# librus_nowa_ocena:
+#   - przedmiot (str)
+#   - ocena (str)
+#   - data (str)
+#   - kategoria (str)
+#   - nauczyciel (str)
+#
+# librus_zmiana_planu:
+#   - data (str)
+#   - dzien_tygodnia (str)
+#   - numer (int)
+#   - przedmiot (str)
+#   - od (str)
+#   - do (str)
+#   - rodzaj (str: 'zastepstwo' | 'odwolana')
+#   - info (str)

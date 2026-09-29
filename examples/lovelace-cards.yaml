@@ -1,0 +1,85 @@
+# Przykładowe karty Lovelace do Home Assistant
+# Zamieniaj "sensor.librus_jan_maat" na swoją encję z Developer Tools → States
+
+# Karta ocen i średnich
+type: entities
+title: "📚 Oceny Librus"
+entities:
+  - entity: sensor.librus_jan_maat_srednia_ocen
+    name: "Globalna średnia"
+  - entity: sensor.librus_jan_maat_oceny
+    name: "Liczba ocen"
+  - entity: sensor.librus_jan_maat_szczesliwy_numerek
+    name: "Szczęśliwy numerek"
+
+---
+
+# Karta wiadomości (wymaga Mushroom Cards z HACS)
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: 📬 Wiadomości Librus
+    subtitle: >
+      {% set n = state_attr('sensor.librus_jan_maat_wiadomosci', 'liczba_nieprzeczytanych') %}
+      {% if n > 0 %}{{ n }} nieprzeczytanych{% else %}Wszystkie przeczytane{% endif %}
+
+  - type: custom:mushroom-template-card
+    primary: >
+      {{ state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')[0].temat | default('brak') }}
+    secondary: >
+      {{ state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')[0].nadawca | default('') }}
+      · {{ state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')[0].data | default('') }}
+    icon: mdi:message-text
+    icon_color: >
+      {% if state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')[0].nieprzeczytana %}red{% else %}grey{% endif %}
+    badge_icon: >
+      {% if state_attr('sensor.librus_jan_maat_wiadomosci', 'wiadomosci')[0].ma_zalacznik %}mdi:paperclip{% endif %}
+
+---
+
+# Karta terminarza (wszystkie zdarzenia)
+type: markdown
+title: 📅 Terminarz
+content: >
+  {% set zdarzenia = state_attr('sensor.librus_jan_maat_terminarz', 'zdarzenia') %}
+  {% if zdarzenia %}
+  | Data | Dzień | Typ | Przedmiot | Opis |
+  |------|-------|-----|-----------|------|
+  {% for z in zdarzenia %}
+  | **{{ z.data }}** | {{ z.tydzien }} | {{ z.tytul }} | {{ z.przedmiot }} | {{ z.szczegoly.Opis if z.szczegoly.Opis != 'unknown' else '' }} |
+  {% endfor %}
+  {% else %}
+  Brak nadchodzących zdarzeń.
+  {% endif %}
+
+---
+
+# Karta sprawdzianów i klasówek (bez dni wolnych)
+type: markdown
+title: 📝 Sprawdziany i klasówki
+content: >
+  {% set zdarzenia = state_attr('sensor.librus_jan_maat_terminarz', 'zdarzenia') %}
+  {% set typy_testow = ['Sprawdzian', 'Kartkówka', 'Klasówka', 'Praca klasowa'] %}
+  {% set sprawdziany = zdarzenia | selectattr('tytul', 'in', typy_testow) | list %}
+  {% if sprawdziany %}
+  | Data | Dzień | Typ | Przedmiot | Opis |
+  |------|-------|-----|-----------|------|
+  {% for z in sprawdziany %}
+  | **{{ z.data }}** | {{ z.tydzien }} | {{ z.tytul }} | {{ z.przedmiot }} | {{ z.szczegoly.Opis if z.szczegoly.Opis != 'unknown' else '' }} |
+  {% endfor %}
+  {% else %}
+  Brak nadchodzących zdarzeń.
+  {% endif %}
+
+---
+
+# Wykres średniej z przedmiotu (Gauge)
+type: gauge
+entity: sensor.librus_jan_maat_srednia_matematyka
+name: "Matematyka - średnia"
+min: 1
+max: 6
+severity:
+  green: 4.5
+  yellow: 3
+  red: 0
